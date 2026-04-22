@@ -1,10 +1,11 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { apiUrl, readJson } from "./api";
+import { CaiPhoneScreen } from "./CaiPhoneScreen";
+import { CaiPhoneThread } from "./CaiPhoneThread";
+import type { ChatMessage } from "./chatUtils";
+import { extractPetParentDisplayName, finalizeWelcomeChips, messagesForApi, parseChips } from "./chatUtils";
+import { MAX_WELCOME_PROMPTS, PhoneWelcomePlaceholder, WelcomePhoneContent } from "./welcomePhone";
 import "./App.css";
-
-type Role = "user" | "assistant";
-
-type ChatMessage = { role: Role; content: string };
 
 type Phase = "gather" | "welcome" | "chat";
 
@@ -13,22 +14,6 @@ function mergeSessionContext(parent: string, pet: string, shop: string) {
   const pe = pet.trim() || "(none provided)";
   const s = shop.trim() || "(none provided)";
   return `### Pet parent profile\n${p}\n\n### Pet profile\n${pe}\n\n### Shopping & browsing history\n${s}`;
-}
-
-function parseChips(text: string): { body: string; chips: string[] } {
-  const lines = text.trimEnd().split("\n");
-  const last = lines[lines.length - 1]?.trim() ?? "";
-  const prefix = "CHIPS:";
-  if (last.startsWith(prefix)) {
-    const rest = last.slice(prefix.length).trim();
-    const chips = rest
-      .split("|")
-      .map((x) => x.trim())
-      .filter(Boolean);
-    const body = lines.slice(0, -1).join("\n").trimEnd();
-    return { body, chips };
-  }
-  return { body: text, chips: [] };
 }
 
 export default function App() {
@@ -44,11 +29,15 @@ export default function App() {
   const [chatLoading, setChatLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [iphonePreview, setIphonePreview] = useState(false);
+  /** Gather panel: on = first meeting + Cai may introduce themself; off = welcome back, no re-intro. */
+  const [firstTimeExperienceWithCai, setFirstTimeExperienceWithCai] = useState(true);
+  /** Gather panel: order placed or received in last 7 days → welcome leads with “Get help with an order”. */
+  const [recentOrderWithin7Days, setRecentOrderWithin7Days] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, chatLoading, phase]);
+  }, [messages, chatLoading, phase, welcomeRaw]);
 
   async function generateWelcome() {
     setError(null);
@@ -61,6 +50,8 @@ export default function App() {
           parentProfile,
           petProfile,
           shoppingHistory,
+          firstTimeExperienceWithCai,
+          recentOrderWithin7Days,
         }),
       });
       const data = await readJson<{ welcome?: string; error?: string }>(res);
@@ -94,6 +85,8 @@ export default function App() {
     setWelcomeRaw("");
     setInput("");
     setError(null);
+    setFirstTimeExperienceWithCai(true);
+    setRecentOrderWithin7Days(false);
   }
 
   async function sendUserText(text: string) {
@@ -101,7 +94,7 @@ export default function App() {
     if (!trimmed || chatLoading) return;
 
     setError(null);
-    const nextMessages: ChatMessage[] = [...messages, { role: "user", content: trimmed }];
+    const nextMessages: ChatMessage[] = [...messages, { role: "user", content: trimmed, sentAt: Date.now() }];
     setMessages(nextMessages);
     setInput("");
     setChatLoading(true);
@@ -111,7 +104,7 @@ export default function App() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: nextMessages.map(({ role, content }) => ({ role, content })),
+          messages: messagesForApi(nextMessages),
           context: context.trim() || undefined,
         }),
       });
@@ -135,6 +128,8 @@ export default function App() {
 
   const stepLabel =
     phase === "gather" ? "Step 1 · Gather context" : phase === "welcome" ? "Step 2 · Your welcome" : "Chat";
+
+  const showWorkbenchChatThread = !(iphonePreview && phase === "chat");
 
   const layoutInner = (
     <>
@@ -173,6 +168,69 @@ export default function App() {
               signals. In a full app this would come from accounts and telemetry; here you supply it so the welcome can
               personalize. Fields can be empty—Cai will still greet you and invite you in.
             </p>
+
+            <div className="field-block session-first-time-block">
+              <div className="session-first-time-row">
+                <div className="session-first-time-text">
+                  <p className="label" id="gather-first-time-label">
+                    First-time experience with Cai
+                  </p>
+                  <p className="label-hint" id="gather-first-time-hint">
+                    When on, the welcome feels like a first meeting—Cai may briefly introduce who they are. When off, it
+                    feels like they&apos;re back—warm &quot;welcome back&quot; energy without re-introducing Cai.
+                  </p>
+                </div>
+                <label className="session-switch" htmlFor="gather-first-time-input">
+                  <input
+                    id="gather-first-time-input"
+                    type="checkbox"
+                    className="session-switch-input"
+                    checked={firstTimeExperienceWithCai}
+                    onChange={(e) => setFirstTimeExperienceWithCai(e.target.checked)}
+                    aria-labelledby="gather-first-time-label"
+                    aria-describedby="gather-first-time-hint"
+                  />
+                  <span className="session-switch-track" aria-hidden>
+                    <span className="session-switch-thumb" />
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <div className="field-block session-first-time-block">
+              <div className="session-first-time-row">
+                <div className="session-first-time-text">
+                  <p className="label" id="gather-recent-order-label">
+                    Recent order (last 7 days)
+                  </p>
+                  <p className="label-hint" id="gather-recent-order-hint">
+                    When on, the welcome screen shows <strong>Get help with an order</strong> as the first suggested chip
+                    (before other starters). In a full app this would come from order telemetry.
+                  </p>
+                </div>
+                <label className="session-switch" htmlFor="gather-recent-order-input">
+                  <input
+                    id="gather-recent-order-input"
+                    type="checkbox"
+                    className="session-switch-input"
+                    checked={recentOrderWithin7Days}
+                    onChange={(e) => setRecentOrderWithin7Days(e.target.checked)}
+                    aria-labelledby="gather-recent-order-label"
+                    aria-describedby="gather-recent-order-hint"
+                  />
+                  <span className="session-switch-track" aria-hidden>
+                    <span className="session-switch-thumb" />
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            {iphonePreview && (
+              <p className="hint gather-phone-hint">
+                With <strong>iPhone preview</strong> on, these fields stay in the workbench; the phone shows the welcome
+                after you generate it, then the full chat thread once you start chatting.
+              </p>
+            )}
 
             <div className="field-stack">
               <div className="field-block">
@@ -243,26 +301,36 @@ export default function App() {
             </h2>
             <p className="panel-lead">This is what a pet parent would see before typing their first message.</p>
 
-            <div className="welcome-card">
-              <div className="welcome-card-head">Cai</div>
-              {(() => {
-                const { body, chips } = parseChips(welcomeRaw);
-                return (
-                  <>
-                    <div className="welcome-body">{body || welcomeRaw}</div>
-                    {chips.length > 0 && (
-                      <div className="welcome-chips" aria-label="Suggested starters">
-                        {chips.map((c, idx) => (
+            {!iphonePreview && (
+              <div className="welcome-card">
+                <div className="welcome-card-head">Cai</div>
+                {(() => {
+                  const { body, chips } = parseChips(welcomeRaw);
+                  const welcomeChips = finalizeWelcomeChips(chips, MAX_WELCOME_PROMPTS, {
+                    recentOrderWithin7Days,
+                  });
+                  return (
+                    <>
+                      <div className="welcome-body">{body || welcomeRaw}</div>
+                      <div className="welcome-chips" aria-label="Suggested starters and customer care">
+                        {welcomeChips.map((c, idx) => (
                           <span key={`${idx}-${c}`} className="chip chip-static">
                             {c}
                           </span>
                         ))}
                       </div>
-                    )}
-                  </>
-                );
-              })()}
-            </div>
+                    </>
+                  );
+                })()}
+              </div>
+            )}
+
+            {iphonePreview && (
+              <p className="hint welcome-phone-hint">
+                The welcome copy is shown in the phone preview. After you start chatting, the full thread scrolls there
+                too.
+              </p>
+            )}
 
             {error && <div className="banner error">{error}</div>}
 
@@ -292,57 +360,68 @@ export default function App() {
               />
               <p className="hint">
                 Built from your three blocks when you clicked &quot;Start chatting.&quot; Cai receives this on every reply
-                so answers stay aligned with the profile and history you simulated.
+                when it helps. It treats browsing and pasted context as hints, not certainty—and it won&apos;t push for pet
+                details until the parent asks about their pet.
               </p>
             </section>
 
             <section className="panel chat-panel" aria-label="Chat">
-              <div className="thread">
-                {messages.map((m, i) => {
-                  const { body, chips } =
-                    m.role === "assistant" ? parseChips(m.content) : { body: m.content, chips: [] };
-                  return (
-                    <div key={i} className={`bubble-row ${m.role}`}>
-                      <div className="bubble">
-                        <div className="bubble-meta">{m.role === "user" ? "You" : "Cai"}</div>
-                        <div className="bubble-body">{body}</div>
-                        {m.role === "assistant" && chips.length > 0 && (
-                          <div className="inline-chips" aria-label="Suggested replies">
-                            {chips.map((c, idx) => (
-                              <button
-                                key={`${idx}-${c}`}
-                                type="button"
-                                className="chip"
-                                disabled={chatLoading}
-                                onClick={() => void sendUserText(c)}
-                              >
-                                {c}
-                              </button>
-                            ))}
+              {showWorkbenchChatThread ? (
+                <>
+                  <div className="thread">
+                    {messages.map((m, i) => {
+                      const { body, chips } =
+                        m.role === "assistant" ? parseChips(m.content) : { body: m.content, chips: [] };
+                      return (
+                        <div key={i} className={`bubble-row ${m.role}`}>
+                          <div className="bubble">
+                            <div className="bubble-meta">{m.role === "user" ? "You" : "Cai"}</div>
+                            <div className="bubble-body">{body}</div>
+                            {m.role === "assistant" && chips.length > 0 && (
+                              <div className="inline-chips" aria-label="Suggested replies">
+                                {chips.map((c, idx) => (
+                                  <button
+                                    key={`${idx}-${c}`}
+                                    type="button"
+                                    className="chip"
+                                    disabled={chatLoading}
+                                    onClick={() => void sendUserText(c)}
+                                  >
+                                    {c}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-                <div ref={bottomRef} />
-              </div>
-
-              {error && <div className="banner error">{error}</div>}
-
-              <form className="composer" onSubmit={onSubmitChat}>
-                <input
-                  className="input"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder="Ask Cai anything…"
-                  autoComplete="off"
-                  disabled={chatLoading}
-                />
-                <button className="send" type="submit" disabled={chatLoading || !input.trim()}>
-                  {chatLoading ? "Sending…" : "Send"}
-                </button>
-              </form>
+                        </div>
+                      );
+                    })}
+                    <div ref={bottomRef} />
+                  </div>
+                  {error && <div className="banner error">{error}</div>}
+                  <form className="composer" onSubmit={onSubmitChat}>
+                    <input
+                      className="input"
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      placeholder="Ask Cai anything…"
+                      autoComplete="off"
+                      disabled={chatLoading}
+                    />
+                    <button className="send" type="submit" disabled={chatLoading || !input.trim()}>
+                      {chatLoading ? "Sending…" : "Send"}
+                    </button>
+                  </form>
+                </>
+              ) : (
+                <>
+                  <p className="hint">
+                    The full conversation (welcome through each reply) scrolls inside the phone preview. Edit session
+                    context above; send messages from the phone composer.
+                  </p>
+                  {error && <div className="banner error">{error}</div>}
+                </>
+              )}
             </section>
           </>
         )}
@@ -352,22 +431,71 @@ export default function App() {
 
   return iphonePreview ? (
     <div className="device-workbench">
+      <div className="workbench-split">
+        <div className="workbench-column">
+          <div className="layout layout--workbench">{layoutInner}</div>
+        </div>
+        <div className="phone-column">
       <div
         className="device-shell"
         role="region"
-        aria-label="Preview frame approximating iPhone 14 portrait, 390 by 844 CSS pixels"
+        aria-label="Phone preview: Cai chat shell (Figma), 390 by 844 CSS pixels"
       >
-        <div className="device-notch" aria-hidden />
-        <div className="device-screen">
-          <div className="device-screen-scroll">
-            <div className="layout layout--phone">{layoutInner}</div>
+        <div className="device-screen device-screen--cai">
+          <div className="device-screen-fill">
+            <CaiPhoneScreen
+              phase={phase}
+              chatInput={input}
+              onChatInputChange={setInput}
+              onSend={() => void sendUserText(input)}
+              chatLoading={chatLoading}
+            >
+              {phase === "chat" ? (
+                welcomeRaw.trim() ? (
+                  <CaiPhoneThread
+                    welcomeText={welcomeRaw}
+                    messages={messages}
+                    petParentName={extractPetParentDisplayName(parentProfile)}
+                    recentOrderWithin7Days={recentOrderWithin7Days}
+                    onChipSelect={(t) => void sendUserText(t)}
+                    chatLoading={chatLoading}
+                    bottomRef={bottomRef}
+                  />
+                ) : (
+                  <PhoneWelcomePlaceholder />
+                )
+              ) : welcomeRaw.trim() ? (
+                <WelcomePhoneContent text={welcomeRaw} recentOrderWithin7Days={recentOrderWithin7Days} />
+              ) : (
+                <PhoneWelcomePlaceholder />
+              )}
+            </CaiPhoneScreen>
           </div>
           <div className="device-home-bar" aria-hidden />
         </div>
       </div>
+        </div>
+      </div>
       <p className="device-caption">
-        Approximates iPhone 14 logical size (390 × 844 pt). For native metrics and safe areas, use
-        browser <strong>responsive design mode</strong> with the same device preset.
+        Phone bezel approximates iPhone 14 (390 × 844 pt). The screen scrolls like the app: welcome, then messages as you
+        chat (see{" "}
+        <a
+          href="https://www.figma.com/design/A3nyvH8N2Gx62Wfxs9opoS/CAI---Phase-3---Evolution?node-id=3065-29802"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Figma: Cai Shop prompt
+        </a>
+        ; suggested prompts match{" "}
+        <a
+          href="https://www.figma.com/design/A3nyvH8N2Gx62Wfxs9opoS/CAI---Phase-3---Evolution?node-id=3065-29722"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Figma: prompt chip (3065:29722)
+        </a>
+        ). With iPhone preview on during <strong>Chat</strong>, the thread moves to the phone; the workbench keeps session
+        context. For native safe areas, use browser <strong>responsive design mode</strong>.
       </p>
     </div>
   ) : (

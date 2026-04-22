@@ -1,0 +1,379 @@
+/* Cai chat screen — Phase 3 section “Click to type interaction” / frame 3145:47986 “Cai Shop welcome” */
+
+.cai-phone {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+}
+
+/* Figma 3145:47987 — full-bleed AI chat frame (gradient fills 390×844) */
+.cai-chat-frame {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.cai-chat-frame-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, #fbf8f5 0%, #fff6f1 64.803%, #f7f4ff 98.707%);
+}
+
+/* Figma “Chat ingress icon” wrapper — 26px cell, 21px artwork */
+.cai-chat-ingress {
+  position: relative;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  margin-left: 2px;
+}
+
+.cai-chat-ingress img {
+  display: block;
+  width: 21px;
+  height: 21px;
+  object-fit: contain;
+}
+
+/* Scrollable welcome / messages — inset scroll under overlaid header (3145:47990) + chat bar */
+.cai-scroll {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  box-sizing: border-box;
+  padding: 10px 14px 8px;
+  /* 44 status + 12 gap + 42 nav + 16 pb = 114 (Figma 3145:47990) */
+  padding-top: 114px;
+  padding-bottom: 96px;
+}
+
+/* Footer chat bar — pinned to bottom of AI chat frame (Figma 3145:47989). Frosted layer: 3180:61102 */
+.cai-chat-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  width: 100%;
+  box-sizing: border-box;
+  border-top: 1px solid rgb(0 0 0 / 0.08);
+  padding: 16px 16px 20px;
+  box-shadow: 0 -2px 12px rgb(0 0 0 / 0.06);
+  background: transparent;
+  isolation: isolate;
+}
+
+/* Figma 3180:61102 — chat bar glass: 12px blur + light veil so thread behind stays soft, not busy */
+.cai-chat-bar-glass {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgb(255 255 255 / 0.42), rgb(255 255 255 / 0.78));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.cai-composer-form {
+  position: relative;
+  z-index: 1;
+}
+
+.cai-composer-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.cai-input-pill {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-height: 46px;
+  padding: 8px 8px 8px 12px;
+  border-radius: 35px;
+  border: 2px solid #bfcdfa;
+  background: #fff;
+  box-shadow:
+    0 0 2px rgba(0, 0, 0, 0.04),
+    0 4px 8px rgba(0, 0, 0, 0.08);
+  position: relative;
+  box-sizing: border-box;
+}
+
+.cai-input-pill--disabled {
+  cursor: default;
+}
+
+.cai-input-field {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  font-family: var(--typography-text-typeface);
+  font-size: var(--typography-fs-product-text-2);
+  line-height: var(--typography-lh-product-text-2);
+  font-weight: var(--typography-fw-editorial-text-normal);
+  letter-spacing: var(--typography-ls-standard);
+  color: var(--color-text-primary);
+  padding: 4px 6px;
+}
+
+.cai-input-field:focus {
+  outline: none;
+}
+
+.cai-input-faux {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 4px 6px;
+  font-family: var(--typography-text-typeface);
+  font-size: var(--typography-fs-product-text-2);
+  line-height: var(--typography-lh-product-text-2);
+  letter-spacing: var(--typography-ls-standard);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cai-input-faux-muted {
+  color: var(--color-text-secondary);
+  font-weight: var(--typography-fw-editorial-text-normal);
+}
+
+.cai-input-faux-brand {
+  color: var(--color-text-brand);
+  font-weight: var(--typography-fw-editorial-text-strong);
+}
+
+/* Figma 3180:61132 — composer send, icon-only (primary filled + arrow) */
+.cai-send-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  background: var(--color-ui-bg-brand-primary);
+  color: #fff;
+  cursor: pointer;
+  box-shadow:
+    0 0 2px rgba(0, 0, 0, 0.06),
+    0 4px 10px rgba(28, 73, 194, 0.28);
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.cai-send-btn:hover:not(:disabled) {
+  background: #1740a8;
+}
+
+.cai-send-btn:focus-visible {
+  outline: 2px solid var(--color-ui-bg-brand-primary);
+  outline-offset: 2px;
+}
+
+.cai-send-btn:disabled {
+  background: #ececec;
+  color: #b0b0b0;
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+.cai-send-btn__icon {
+  display: block;
+}
+
+/* Welcome inside scroll — Figma 3145:47986 text inset */
+.cai-scroll .phone-welcome {
+  padding: 4px 2px 12px;
+}
+
+/* Figma 3065:29802 — full thread in AI chat frame (scrolls under header + above composer) */
+.cai-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  padding: 0 0 12px;
+  min-height: min-content;
+}
+
+.cai-thread-welcome {
+  padding: 16px 16px 0;
+}
+
+.cai-thread-end {
+  height: 1px;
+  flex-shrink: 0;
+}
+
+.cai-msg-user {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  padding: 0 16px;
+}
+
+/* Figma 3177:61059 “Customer message bubble” — timestamp row */
+.cai-msg-user-meta {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  padding-right: 4px;
+  font-family: var(--typography-text-typeface);
+  font-size: 11px;
+  line-height: 15px;
+  letter-spacing: var(--typography-ls-standard);
+  white-space: nowrap;
+}
+
+.cai-msg-user-name {
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.cai-msg-user-time {
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+/* Figma 3177:61063 — min 120px, max 292px; text left-aligned inside bubble */
+.cai-msg-user-bubble {
+  min-width: 120px;
+  max-width: 292px;
+  width: fit-content;
+  background: rgba(223, 234, 255, 0.8);
+  border-radius: 24px;
+  padding: 12px 20px;
+  box-shadow:
+    0 0 1px rgba(0, 0, 0, 0.24),
+    0 2px 4px rgba(0, 0, 0, 0.12);
+}
+
+.cai-msg-user-text {
+  margin: 0;
+  font-family: var(--typography-text-typeface);
+  font-size: 15px;
+  line-height: 24px;
+  font-weight: 400;
+  color: var(--color-text-primary);
+  text-align: left;
+  white-space: pre-wrap;
+}
+
+.cai-msg-ai {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 16px;
+  align-items: flex-start;
+}
+
+.cai-msg-ai--typing {
+  padding-top: 4px;
+}
+
+.cai-msg-ai-body {
+  white-space: pre-wrap;
+  width: 100%;
+}
+
+.cai-msg-ai-body--muted {
+  color: var(--color-text-secondary);
+}
+
+.cai-msg-ai-chips {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.cai-prompt-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px 4px 8px;
+  border-radius: 10px;
+  border: 2px solid #fff;
+  background: rgba(255, 255, 255, 0.5);
+  box-shadow: 3px 1px 8px rgba(87, 101, 156, 0.15);
+  font-family: var(--typography-text-typeface);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--color-text-brand);
+  cursor: pointer;
+  text-align: left;
+}
+
+.cai-prompt-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cai-prompt-chip:not(:disabled):hover {
+  background: rgba(255, 255, 255, 0.85);
+}
+
+/* Welcome preview before “Start chatting”: same surface as tappable chips, not focusable */
+button.cai-prompt-chip.cai-prompt-chip--locked {
+  cursor: default;
+  pointer-events: none;
+  user-select: none;
+}
+
+button.cai-prompt-chip.cai-prompt-chip--locked:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+button.cai-prompt-chip {
+  font: inherit;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+/* Welcome stack spacing under CTA — aligns with 3065:29802 frame */
+.phone-welcome-prompts {
+  margin-top: 14px;
+}
+
+.cai-typing-pill {
+  margin: 0;
+  font-family: var(--typography-text-typeface);
+  font-size: 15px;
+  line-height: 20px;
+}
+
+.cai-typing-brand {
+  font-weight: 500;
+  color: var(--color-text-brand);
+}
+
+.cai-typing-muted {
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}

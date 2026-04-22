@@ -5,7 +5,11 @@ import dotenv from "dotenv";
 import express from "express";
 import OpenAI from "openai";
 import { CAI_SYSTEM_PROMPT } from "./caiSystemPrompt.js";
-import { buildWelcomeSystemPrompt } from "./welcomePrompt.js";
+import {
+  buildWelcomeSystemPrompt,
+  normalizeFirstTimeExperienceWithCai,
+  normalizeRecentOrderWithin7Days,
+} from "./welcomePrompt.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Load .env from project root (parent of /server)
@@ -20,6 +24,13 @@ const app = express();
 app.use(cors({ origin: true }));
 app.use(express.json({ limit: "256kb" }));
 
+/*
+ * Production intent (Chewy app): Cai will run in-app with real catalog/cart/auth. Product actions
+ * (add to cart, returns, purchase, Autoship, etc.) should call native commerce modules—not browser PDP
+ * links from this prototype. Here we only proxy text to OpenAI; keep SKUs and offers server-verified
+ * when you wire catalog tools or BFF endpoints.
+ */
+
 const MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 
 app.get("/api/health", (_req, res) => {
@@ -28,7 +39,9 @@ app.get("/api/health", (_req, res) => {
 
 /**
  * POST /api/welcome
- * Body: { parentProfile?: string, petProfile?: string, shoppingHistory?: string }
+ * Body: { parentProfile?, petProfile?, shoppingHistory?, firstTimeExperienceWithCai?, recentOrderWithin7Days? }
+ *   firstTimeExperienceWithCai defaults true — first-meeting tone; false = returning / welcome back, no Cai intro.
+ *   recentOrderWithin7Days when true — welcome UI prepends “Get help with an order” as first chip; model must not duplicate.
  * Returns { welcome: string } — personalized opening before chat.
  */
 app.post("/api/welcome", async (req, res) => {
@@ -41,7 +54,15 @@ app.post("/api/welcome", async (req, res) => {
       return;
     }
 
-    const { parentProfile = "", petProfile = "", shoppingHistory = "" } = req.body || {};
+    const {
+      parentProfile = "",
+      petProfile = "",
+      shoppingHistory = "",
+      firstTimeExperienceWithCai,
+      recentOrderWithin7Days,
+    } = req.body || {};
+    const firstTime = normalizeFirstTimeExperienceWithCai(firstTimeExperienceWithCai);
+    const recentOrder = normalizeRecentOrderWithin7Days(recentOrderWithin7Days);
 
     const bundle = [
       "### Pet parent profile",
@@ -59,10 +80,16 @@ app.post("/api/welcome", async (req, res) => {
     const completion = await openai.chat.completions.create({
       model: MODEL,
       messages: [
-        { role: "system", content: buildWelcomeSystemPrompt() },
+        {
+          role: "system",
+          content: buildWelcomeSystemPrompt({
+            firstTimeExperienceWithCai: firstTime,
+            recentOrderWithin7Days: recentOrder,
+          }),
+        },
         {
           role: "user",
-          content: `Context bundle for the welcome screen:\n\n${bundle}\n\nWrite Cai's welcome message now.`,
+          content: `${firstTime ? "[[Session: FIRST-TIME with Cai — do not use welcome-back or returning-chatter phrasing.]]\n\n" : "[[Session: RETURNING — welcome-back tone is OK; do not re-introduce Cai from scratch.]]\n\n"}${recentOrder ? "[[Recent order within 7 days: ON — do not put “Get help with an order” in CHIPS; the app shows it first.]]\n\n" : ""}Context bundle for the welcome screen:\n\n${bundle}\n\nWrite Cai's welcome message now.`,
         },
       ],
       temperature: 0.75,
@@ -80,6 +107,8 @@ app.post("/api/welcome", async (req, res) => {
 /**
  * POST /api/chat
  * Body: { messages: { role: 'user'|'assistant', content: string }[], context?: string }
+ * Prototype: plain text only. In the Chewy app, pair replies with verified product payloads and
+ * in-app cart / checkout / return handlers (see file header above).
  */
 app.post("/api/chat", async (req, res) => {
   try {

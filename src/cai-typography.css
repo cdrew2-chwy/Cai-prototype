@@ -1,0 +1,123 @@
+/**
+ * CAI Phase 3 typography — Figma “Free text” section 796:4081
+ * https://www.figma.com/design/A3nyvH8N2Gx62Wfxs9opoS/CAI---Phase-3---Evolution?node-id=796-4081
+ * Names mirror Chirp variables from MCP export. Design uses Gordita; stack prefers Gordita if installed locally.
+ */
+
+:root {
+  --typography-display-typeface: "Gordita", "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --typography-text-typeface: "Gordita", "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --typography-ls-standard: 0;
+
+  /* Editorial / Heading-2-Stronger — Figma Headline 796:4187
+     https://www.figma.com/design/A3nyvH8N2Gx62Wfxs9opoS/CAI---Phase-3---Evolution?node-id=796-4187
+     Use sparingly in welcome UI: **one sentence or less** (navy display). */
+  --typography-fs-editorial-heading-2: 23px;
+  --typography-lh-editorial-heading-2: 36px;
+  --typography-fw-editorial-heading-stronger: 700;
+
+  /* Editorial / Heading-1-Stronger (1117:13599 Emphasized reply) */
+  --typography-fs-editorial-heading-1: 19px;
+  --typography-lh-editorial-heading-1: 30px;
+
+  /* Editorial / Text-1-Strong (796:9959 Subhead 2) */
+  --typography-fs-editorial-text-1: 13px;
+  --typography-lh-editorial-text-1: 21px;
+  --typography-fw-editorial-text-strong: 500;
+
+  /* Editorial / Text-2 + Text-2-Strong (796:9958 Body, 796:4190 Subhead 1) */
+  --typography-fs-editorial-text-2: 15px;
+  --typography-lh-editorial-text-2: 24px;
+  --typography-fw-editorial-text-normal: 400;
+
+  /* Utility / Utility-3 (796:9965) */
+  --typography-fs-utility-3: 13px;
+  --typography-lh-utility-3: 18px;
+  --typography-fw-utility-normal: 400;
+
+  /* Product / Text-2 (composer — 3145:47989) */
+  --typography-fs-product-text-2: 15px;
+  --typography-lh-product-text-2: 20px;
+
+  /* Product / Text-3 (keyboard typing line in file) */
+  --typography-fs-product-text-3: 19px;
+  --typography-lh-product-text-3: 25px;
+
+  /* Colors from exports */
+  --color-ui-bg-brand-loyalty-03: #001a70;
+  --color-text-primary: #121212;
+  --color-text-secondary: #4d4d4d;
+  --color-text-tertiary: #767676;
+  --color-ui-bg-brand-primary: #1c49c2;
+  --color-text-brand: #4657c7;
+}
+
+/* --- Utilities (match Figma text styles) --- */
+
+.cai-text-editorial-heading-2 {
+  font-family: var(--typography-display-typeface);
+  font-size: var(--typography-fs-editorial-heading-2);
+  line-height: var(--typography-lh-editorial-heading-2);
+  font-weight: var(--typography-fw-editorial-heading-stronger);
+  letter-spacing: var(--typography-ls-standard);
+  color: var(--color-ui-bg-brand-loyalty-03);
+  margin: 0;
+}
+
+.cai-text-editorial-heading-1 {
+  font-family: var(--typography-display-typeface);
+  font-size: var(--typography-fs-editorial-heading-1);
+  line-height: var(--typography-lh-editorial-heading-1);
+  font-weight: var(--typography-fw-editorial-heading-stronger);
+  letter-spacing: var(--typography-ls-standard);
+  color: var(--color-ui-bg-brand-loyalty-03);
+  margin: 0;
+}
+
+.cai-text-editorial-text-1-strong {
+  font-family: var(--typography-text-typeface);
+  font-size: var(--typography-fs-editorial-text-1);
+  line-height: var(--typography-lh-editorial-text-1);
+  font-weight: var(--typography-fw-editorial-text-strong);
+  letter-spacing: var(--typography-ls-standard);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.cai-text-editorial-text-2 {
+  font-family: var(--typography-text-typeface);
+  font-size: var(--typography-fs-editorial-text-2);
+  line-height: var(--typography-lh-editorial-text-2);
+  font-weight: var(--typography-fw-editorial-text-normal);
+  letter-spacing: var(--typography-ls-standard);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.cai-text-editorial-text-2-strong {
+  font-family: var(--typography-text-typeface);
+  font-size: var(--typography-fs-editorial-text-2);
+  line-height: var(--typography-lh-editorial-text-2);
+  font-weight: var(--typography-fw-editorial-text-strong);
+  letter-spacing: var(--typography-ls-standard);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.cai-text-utility-3 {
+  font-family: var(--typography-text-typeface);
+  font-size: var(--typography-fs-utility-3);
+  line-height: var(--typography-lh-utility-3);
+  font-weight: var(--typography-fw-utility-normal);
+  letter-spacing: var(--typography-ls-standard);
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.cai-text-product-text-2 {
+  font-family: var(--typography-text-typeface);
+  font-size: var(--typography-fs-product-text-2);
+  line-height: var(--typography-lh-product-text-2);
+  font-weight: var(--typography-fw-editorial-text-normal);
+  letter-spacing: var(--typography-ls-standard);
+}

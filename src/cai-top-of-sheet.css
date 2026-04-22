@@ -1,0 +1,182 @@
+/* Figma node 1265:67137 / instance 3145:47990 — “Cai - Top of sheet”
+   https://www.figma.com/design/A3nyvH8N2Gx62Wfxs9opoS/CAI---Phase-3---Evolution?node-id=3145-48434 */
+
+/* Phone: overlay inside AI chat frame — do NOT use transform here (breaks notch centering + backdrop-filter). */
+.cai-tos.cai-tos--phone-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 4;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  border-bottom: none;
+  box-sizing: border-box;
+}
+
+.cai-tos {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 16px;
+  width: 100%;
+  box-sizing: border-box;
+  /* Figma: backdrop-blur(3px) + gradient to top — white at top, subtle glass at bottom of band */
+  background: linear-gradient(to top, rgba(255, 255, 255, 0.08) 7.018%, #ffffff 100%);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+
+.cai-tos__status {
+  position: relative;
+  height: 44px;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.cai-tos__notch {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+  width: 219px;
+  height: 30px;
+  pointer-events: none;
+}
+
+.cai-tos__notch img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.cai-tos__status-right {
+  position: absolute;
+  right: 14.67px;
+  top: 17.33px;
+  width: 66.661px;
+  height: 11.336px;
+  pointer-events: none;
+}
+
+.cai-tos__status-right img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.cai-tos__time-wrap {
+  position: absolute;
+  left: 24px;
+  top: 12px;
+  height: 21px;
+  min-width: 54px;
+  width: max-content;
+  max-width: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.cai-tos__time {
+  display: block;
+  margin: 0;
+  font-family: "SF Pro Text", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 20px;
+  letter-spacing: -0.5px;
+  text-align: left;
+  white-space: nowrap;
+  color: #121212;
+}
+
+.cai-tos__nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  padding: 0 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.cai-tos__side {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.cai-tos__side--left {
+  justify-content: flex-start;
+}
+
+.cai-tos__side--right {
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.cai-tos__logo {
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  position: relative;
+}
+
+.cai-tos__logo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.cai-tos__icon-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 56px;
+  border: 1px solid #fff;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(3.5px);
+  -webkit-backdrop-filter: blur(3.5px);
+  box-shadow:
+    0 0 15px rgba(0, 0, 0, 0.1),
+    0 4px 5px rgba(0, 0, 0, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.cai-tos__icon-btn:hover {
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.cai-tos__icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+}
+
+.cai-tos__icon-wrap--back {
+  width: 24px;
+  height: 24px;
+}
+
+.cai-tos__icon-wrap img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
