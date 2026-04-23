@@ -52,7 +52,7 @@
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   box-sizing: border-box;
-  padding: 10px 14px 8px;
+  padding: 10px 16px 8px;
   /* 44 status + 12 gap + 42 nav + 16 pb = 114 (Figma 3145:47990) */
   padding-top: 114px;
   padding-bottom: 96px;
@@ -220,7 +220,8 @@
 }
 
 .cai-thread-welcome {
-  padding: 16px 16px 0;
+  /* Horizontal inset lives on .cai-scroll (16px); welcome spans full thread width here. */
+  padding: 16px 0 0;
 }
 
 .cai-thread-end {
@@ -233,7 +234,7 @@
   flex-direction: column;
   align-items: flex-end;
   gap: 4px;
-  padding: 0 16px;
+  padding: 0;
 }
 
 /* Figma 3177:61059 “Customer message bubble” — timestamp row */
@@ -259,13 +260,14 @@
   color: var(--color-text-secondary);
 }
 
-/* Figma 3177:61063 — min 120px, max 292px; text left-aligned inside bubble */
+/* Figma 3177:61059 / 3177:61063 — customer bubble: three rounded corners, top-right sharp (point). */
 .cai-msg-user-bubble {
   min-width: 120px;
   max-width: 292px;
   width: fit-content;
   background: rgba(223, 234, 255, 0.8);
-  border-radius: 24px;
+  /* Physical corners: TL, TR, BR, BL — TR = 0 matches right-aligned “tail” toward meta row. */
+  border-radius: 24px 0 24px 24px;
   padding: 12px 20px;
   box-shadow:
     0 0 1px rgba(0, 0, 0, 0.24),
@@ -287,7 +289,9 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 0 16px;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0;
   align-items: flex-start;
 }
 

@@ -14,14 +14,16 @@ import statusRightSvg from "./assets/cai-header/status-right.svg";
 import tosSheetBackSvg from "./assets/cai-header/tos-sheet-back.svg";
 import "./cai-top-of-sheet.css";
 
-/** Status-style clock: 24-hour, no seconds, no AM/PM; single-digit hours (e.g. 9:15 not 09:15); updates every minute. */
+/** iOS US status bar: 12-hour, no AM/PM, hour not zero-padded (1–12), minutes two digits; updates every minute. `datetime` is 24h. */
 function useStatusBarTime(): { label: string; dateTime: string } {
   const snapshot = () => {
     const d = new Date();
-    const h = d.getHours();
+    const h24 = d.getHours();
     const m = d.getMinutes();
-    const label = `${h}:${String(m).padStart(2, "0")}`;
-    const dateTime = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    let h12 = h24 % 12;
+    if (h12 === 0) h12 = 12;
+    const label = `${h12}:${String(m).padStart(2, "0")}`;
+    const dateTime = `${String(h24).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
     return { label, dateTime };
   };
 

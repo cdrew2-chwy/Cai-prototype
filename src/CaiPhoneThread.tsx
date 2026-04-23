@@ -1,6 +1,7 @@
 import type { RefObject } from "react";
+import { CaiProductShowcase } from "./CaiProductShowcase";
 import type { ChatMessage } from "./chatUtils";
-import { formatChatTimestamp, parseChips } from "./chatUtils";
+import { formatChatTimestamp, parseAssistantMessage } from "./chatUtils";
 import { WelcomePhoneContent } from "./welcomePhone";
 
 type Props = {
@@ -58,10 +59,24 @@ export function CaiPhoneThread({
             </div>
           );
         }
-        const { body, chips } = parseChips(m.content);
+        const { body, chips, products, recommendationRationale } = parseAssistantMessage(m.content);
+        const sectionTitle = products?.heading?.trim() || "Recommendation";
         return (
           <div key={`a-${i}`} className="cai-msg-ai">
-            <div className="cai-msg-ai-body cai-text-editorial-text-2 cai-msg-ai-body--muted">{body}</div>
+            {body.trim() ? (
+              <div className="cai-msg-ai-body cai-text-editorial-text-2 cai-msg-ai-body--muted">{body}</div>
+            ) : null}
+            {products ? (
+              <section className="cai-recommendation-section" aria-label="Product recommendation">
+                <h3 className="cai-recommendation-section__title">{sectionTitle}</h3>
+                <CaiProductShowcase block={products} suppressHeading />
+                {recommendationRationale?.trim() ? (
+                  <div className="cai-recommendation-section__why cai-text-editorial-text-2 cai-msg-ai-body--muted">
+                    {recommendationRationale}
+                  </div>
+                ) : null}
+              </section>
+            ) : null}
             {chips.length > 0 ? (
               <div className="cai-msg-ai-chips" aria-label="Suggested replies">
                 {chips.map((c, idx) => (

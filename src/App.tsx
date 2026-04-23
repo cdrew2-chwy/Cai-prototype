@@ -3,7 +3,15 @@ import { apiUrl, readJson } from "./api";
 import { CaiPhoneScreen } from "./CaiPhoneScreen";
 import { CaiPhoneThread } from "./CaiPhoneThread";
 import type { ChatMessage } from "./chatUtils";
-import { extractPetParentDisplayName, finalizeWelcomeChips, messagesForApi, parseChips } from "./chatUtils";
+import { CaiProductShowcase } from "./CaiProductShowcase";
+import {
+  extractPetParentDisplayName,
+  finalizeWelcomeChips,
+  messagesForApi,
+  parseAssistantMessage,
+  parseChips,
+  stripWelcomeMarkdownBold,
+} from "./chatUtils";
 import { MAX_WELCOME_PROMPTS, PhoneWelcomePlaceholder, WelcomePhoneContent } from "./welcomePhone";
 import "./App.css";
 
@@ -58,7 +66,7 @@ export default function App() {
       if (!res.ok) {
         throw new Error(data.error || `Request failed (${res.status})`);
       }
-      setWelcomeRaw(data.welcome ?? "");
+      setWelcomeRaw(stripWelcomeMarkdownBold(data.welcome ?? ""));
       setPhase("welcome");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");
@@ -305,13 +313,14 @@ export default function App() {
               <div className="welcome-card">
                 <div className="welcome-card-head">Cai</div>
                 {(() => {
-                  const { body, chips } = parseChips(welcomeRaw);
+                  const welcomeClean = stripWelcomeMarkdownBold(welcomeRaw);
+                  const { body, chips } = parseChips(welcomeClean);
                   const welcomeChips = finalizeWelcomeChips(chips, MAX_WELCOME_PROMPTS, {
                     recentOrderWithin7Days,
                   });
                   return (
                     <>
-                      <div className="welcome-body">{body || welcomeRaw}</div>
+                      <div className="welcome-body">{body || welcomeClean}</div>
                       <div className="welcome-chips" aria-label="Suggested starters and customer care">
                         {welcomeChips.map((c, idx) => (
                           <span key={`${idx}-${c}`} className="chip chip-static">
@@ -370,13 +379,25 @@ export default function App() {
                 <>
                   <div className="thread">
                     {messages.map((m, i) => {
-                      const { body, chips } =
-                        m.role === "assistant" ? parseChips(m.content) : { body: m.content, chips: [] };
+                      const { body, chips, products, recommendationRationale } =
+                        m.role === "assistant"
+                          ? parseAssistantMessage(m.content)
+                          : { body: m.content, chips: [], products: null, recommendationRationale: undefined };
+                      const sectionTitle = products?.heading?.trim() || "Recommendation";
                       return (
                         <div key={i} className={`bubble-row ${m.role}`}>
                           <div className="bubble">
                             <div className="bubble-meta">{m.role === "user" ? "You" : "Cai"}</div>
-                            <div className="bubble-body">{body}</div>
+                            {body.trim() ? <div className="bubble-body">{body}</div> : null}
+                            {m.role === "assistant" && products ? (
+                              <section className="cai-recommendation-section" aria-label="Product recommendation">
+                                <h3 className="cai-recommendation-section__title">{sectionTitle}</h3>
+                                <CaiProductShowcase block={products} suppressHeading />
+                                {recommendationRationale?.trim() ? (
+                                  <div className="bubble-body cai-recommendation-section__why">{recommendationRationale}</div>
+                                ) : null}
+                              </section>
+                            ) : null}
                             {m.role === "assistant" && chips.length > 0 && (
                               <div className="inline-chips" aria-label="Suggested replies">
                                 {chips.map((c, idx) => (

@@ -530,6 +530,8 @@
 .bubble-row.user .bubble {
   background: #ecfeff;
   border-color: #bae6fd;
+  /* Match Figma 3177:61059 — pet parent bubble: 24px radii, sharp top-right. */
+  border-radius: 24px 0 24px 24px;
 }
 
 .bubble-meta {

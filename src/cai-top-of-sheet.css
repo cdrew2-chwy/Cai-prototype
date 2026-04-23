@@ -75,9 +75,9 @@
   left: 24px;
   top: 12px;
   height: 21px;
-  min-width: 54px;
+  min-width: 48px;
   width: max-content;
-  max-width: 120px;
+  max-width: 96px;
   display: flex;
   align-items: center;
   justify-content: flex-start;
