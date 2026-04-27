@@ -11,22 +11,28 @@ export function normalizeFirstTimeExperienceWithCai(v) {
 }
 
 /**
+ * From gather **Order history**: at least one order with a placed date in the last 10 days.
  * @param {unknown} v
- * @returns {boolean} true = pet parent placed or received an order in the last 7 days (welcome order-help chip)
+ * @returns {boolean}
  */
-export function normalizeRecentOrderWithin7Days(v) {
+export function normalizeOrderPlacedInLast10Days(v) {
   if (v === true || v === "true" || v === 1 || v === "1") return true;
   return false;
 }
 
+const WELCOME_CHIPS_ORDER_IN_10_DAYS = `
+
+---
+WELCOME CHIPS (order in last 10 days): The client determined from **Order history** that at least one order was **placed in the last 10 days**. The product **pre-appends** “Get help with an order” as the **first** suggested-prompt chip on the welcome screen. Do **not** include the exact phrase “Get help with an order” in your CHIPS line. On that line, use **at most two** other short, conversational starter prompts; the product appends “Chat live with customer care” as the **last** chip.`;
+
 /**
- * @param {{ firstTimeExperienceWithCai?: boolean; recentOrderWithin7Days?: boolean }} [options]
+ * @param {{ firstTimeExperienceWithCai?: boolean, orderPlacedInLast10Days?: boolean }} [options]
  *   When true (default), first-meeting tone with optional self-intro. When false, returning-user tone without re-introducing Cai.
- *   When recentOrderWithin7Days is true, the app prepends “Get help with an order” as the first chip—model must not duplicate it.
+ *   When `orderPlacedInLast10Days` is true (from gather Order history), the app always shows “Get help with an order” first; the model must not repeat it in CHIPS.
  */
 export function buildWelcomeSystemPrompt(options = {}) {
   const firstTime = normalizeFirstTimeExperienceWithCai(options.firstTimeExperienceWithCai);
-  const recentOrder = normalizeRecentOrderWithin7Days(options.recentOrderWithin7Days);
+  const orderIn10 = normalizeOrderPlacedInLast10Days(options.orderPlacedInLast10Days);
 
   const toneMandate = firstTime
     ? `
@@ -45,14 +51,9 @@ WELCOME SESSION MODE: **RETURNING** (workbench toggle OFF)
 - **Do not** introduce Cai from scratch (“I’m Cai,” “I’m Chewy’s AI…”). Sound like a **continuing relationship**. If the bundle is thin, stay familiar—do **not** pivot to first-time onboarding.
 `;
 
-  const chipsRecentOrder = recentOrder
-    ? `
-
----
-WELCOME CHIPS (session flag): **Recent order (placed or received in the last 7 days)** is ON. Do **not** include the exact phrase “Get help with an order” in CHIPS—the product **always** prepends that as the **first** chip. On your CHIPS line, use **at most two** other starters in the **same conversational, pet-personalized tone** as the welcome CHIPS rules (each one short line, ~≤52 characters). The final chip slot is reserved for customer care.`
-    : "";
-
-  return `${CAI_SYSTEM_PROMPT}${WELCOME_TASK}${toneMandate}${chipsRecentOrder}`;
+  return `${CAI_SYSTEM_PROMPT}${WELCOME_TASK}${toneMandate}${
+    orderIn10 ? WELCOME_CHIPS_ORDER_IN_10_DAYS : ""
+  }`;
 }
 
 /**

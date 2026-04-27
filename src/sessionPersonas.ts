@@ -2,66 +2,74 @@ import { formatStructuredOrderHistoryAppend, type PrototypeOrderRow } from "./or
 
 /**
  * Pre-filled “Tell Cai about this session” bundles for the gather step.
- * Each persona maps to the three blocks merged into the welcome / chat context bundle.
+ * Each persona maps to pet parent, pet, order history, and browsing history (welcome / chat context bundle).
  */
 
 const SUNNY_ORDER_HELP_ROWS: PrototypeOrderRow[] = [
   {
     id: "o1",
-    orderNumber: "#9001001",
-    summary:
-      "Iams Proactive Health Healthy Aging Large Breed Adult Senior with Real Chicken Dry Dog Food, 30-lb bag, bundle of 2",
+    orderNumber: "#7309518462",
+    summary: "https://www.chewy.com/iams-proactive-health-healthy-aging/dp/46729",
     status: "Delivered",
-    placedAt: "2026-04-08T14:00:00.000Z",
+    placedAt: "2026-04-27T12:00:00.000Z",
+    autoship: true,
+    meta: "On Autoship — Expected delivery: Wed, Apr 29",
   },
   {
     id: "o2",
-    orderNumber: "#9001002",
-    summary: "Greenies Aging Care Natural Large Dental Dog Treats, 17 count",
-    status: "In transit",
-    placedAt: "2026-04-15T14:00:00.000Z",
+    orderNumber: "#5918374065",
+    summary: "https://www.chewy.com/greenies-aging-care-large-dental-dog/dp/183796",
+    status: "Delivered",
+    placedAt: "2026-04-14T12:00:00.000Z",
+    autoship: true,
+    meta: "On Autoship — Expected delivery: Fri, Apr 17",
   },
   {
     id: "o3",
-    orderNumber: "#9001003",
-    summary: "Playology Pork Sausage Scented Dental Chew Ball Dog Toy, Medium",
+    orderNumber: "#4826193750",
+    summary: "https://www.chewy.com/playology-all-natural-pork-sausage/dp/348131",
     status: "Delivered",
-    placedAt: "2026-04-19T18:00:00.000Z",
+    placedAt: "2026-03-22T12:00:00.000Z",
+    autoship: false,
+    meta: "Expected delivery: Tue, Mar 24",
   },
 ];
 
 const BUG_ORDER_HELP_ROWS: PrototypeOrderRow[] = [
   {
     id: "b1",
-    orderNumber: "#8002001",
+    orderNumber: "#9271503846",
     summary: "Purina ONE Whole Body Support Chicken Dry Cat Food, 22-lb bag",
     status: "Delivered",
     placedAt: "2026-02-01T12:00:00.000Z",
+    autoship: true,
   },
   {
     id: "b2",
-    orderNumber: "#8002002",
+    orderNumber: "#3649281750",
     summary: "Tidy Cats Free & Clean Unscented Clumping Clay Cat Litter, 14-lb jug",
     status: "Processing",
     placedAt: "2026-04-10T10:00:00.000Z",
+    autoship: true,
   },
   {
     id: "b3",
-    orderNumber: "#8002003",
+    orderNumber: "#8150394762",
     summary: "NexGard COMBO Topical for Cats, 5.6-16.5 lbs. (Yellow Box), 6 Doses (6-mos. supply)",
     status: "Delivered",
     placedAt: "2025-12-20T10:00:00.000Z",
+    autoship: true,
   },
   {
     id: "b4",
-    orderNumber: "#8002004",
+    orderNumber: "#6492730158",
     summary: "Meow Mix Irresistibles White Meat Chicken Soft & Chewy Cat Treats, 12-oz bag",
     status: "Delivered",
     placedAt: "2026-04-08T10:00:00.000Z",
   },
   {
     id: "b5",
-    orderNumber: "#8002005",
+    orderNumber: "#5038264971",
     summary: "Potaroma Crinkle Fish Cat Toys with Catnip, Multi-Color, 7.8-in, 3 count",
     status: "Delivered",
     placedAt: "2026-04-08T10:00:00.000Z",
@@ -74,9 +82,10 @@ export type SessionPersona = {
   title: string;
   parentProfile: string;
   petProfile: string;
-  shoppingHistory: string;
-  /** When true, selecting this persona checks “Recent order (last 7 days)” to match the story. */
-  recentOrderWithin7Days?: boolean;
+  /** Order bundle string with `### Structured order history (prototype)` (from `formatStructuredOrderHistoryAppend`). */
+  orderHistory: string;
+  /** Browsing / search / category signals (non-order). */
+  browsingHistory: string;
 };
 
 export const SESSION_PERSONAS: SessionPersona[] = [
@@ -96,21 +105,10 @@ Weight: 74 lbs
 Health Conditions: Diabetes
 Allergies: Dust mites
 Medications: None`,
-    shoppingHistory: `Recent order history:
+    orderHistory: formatStructuredOrderHistoryAppend(SUNNY_ORDER_HELP_ROWS).replace(/^\n+/, ""),
+    browsingHistory: `Recent browsing (simulated):
 
-Iams Proactive Health Healthy Aging Large Breed Adult Senior with Real Chicken Dry Dog Food, 30-lb bag, bundle of 2
-On Autoship, every 5 weeks
-
-Greenies Aging Care Natural Large Dental Dog Treats, 17 count
-On Autoship, every 5 weeks
-
-Playology Pork Sausage Scented Dental Chew Ball Dog Toy, Medium
-Purchased 3 days ago, delivered today
-
-Recent browsing queries:
-Orthopedic dog bed, Senior dog supplements
-${formatStructuredOrderHistoryAppend(SUNNY_ORDER_HELP_ROWS)}`,
-    recentOrderWithin7Days: true,
+Orthopedic dog bed, senior dog supplements`,
   },
   {
     id: "bug-himalayan-cat",
@@ -128,26 +126,10 @@ Weight: 10 lbs
 Health conditions: none
 Allergies: none
 Prescriptions: NexGuard`,
-    shoppingHistory: `Recent order history:
+    orderHistory: formatStructuredOrderHistoryAppend(BUG_ORDER_HELP_ROWS).replace(/^\n+/, ""),
+    browsingHistory: `Recent browsing (simulated):
 
-Purina ONE Whole Body Support Chicken Dry Cat Food, 22-lb bag
-On Autoship, every 4 months
-
-Tidy Cats Free & Clean Unscented Clumping Clay Cat Litter, 14-lb jug
-On Autoship, every 4 months
-
-NexGard COMBO Topical for Cats, 5.6-16.5 lbs. (Yellow Box), 6 Doses (6-mos. supply)
-On Autoship, every 6 months
-
-Meow Mix Irresistibles White Meat Chicken Soft & Chewy Cat Treats, 12-oz bag
-Purchased 2 weeks ago
-
-Potaroma Crinkle Fish Cat Toys with Catnip, Multi-Color, 7.8-in, 3 count
-Purchased 2 weeks ago
-
-Recent browsing queries:
-Cat scratching post, Adult cat food
-${formatStructuredOrderHistoryAppend(BUG_ORDER_HELP_ROWS)}`,
+Cat scratching post, adult cat food`,
   },
 ];
 

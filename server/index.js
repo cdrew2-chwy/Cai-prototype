@@ -8,11 +8,13 @@ import { CAI_SYSTEM_PROMPT } from "./caiSystemPrompt.js";
 import {
   buildWelcomeSystemPrompt,
   normalizeFirstTimeExperienceWithCai,
-  normalizeRecentOrderWithin7Days,
+  normalizeOrderPlacedInLast10Days,
 } from "./welcomePrompt.js";
 import { ensureVetIngressInReply } from "./vetIngressGuard.js";
 import { ensureVetAlternatePathChips } from "./vetFollowUpChipsGuard.js";
 import { ensureOrderCardsInReply } from "./orderHelpGuard.js";
+import { orderBlockForLlmBundle } from "./orderContextBundle.js";
+import { enrichOrderHistoryWithPdpData } from "./chewyPdpEnrich.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Load .env from project root (parent of /server)
@@ -42,9 +44,10 @@ app.get("/api/health", (_req, res) => {
 
 /**
  * POST /api/welcome
- * Body: { parentProfile?, petProfile?, shoppingHistory?, firstTimeExperienceWithCai?, recentOrderWithin7Days? }
+ * Body: { parentProfile?, petProfile?, orderHistory?, browsingHistory?, shoppingHistory? (legacy), firstTimeExperienceWithCai?, orderPlacedInLast10Days? }
  *   firstTimeExperienceWithCai defaults true — first-meeting tone; false = returning / welcome back, no Cai intro.
- *   recentOrderWithin7Days when true — welcome UI prepends “Get help with an order” as first chip; model must not duplicate.
+ *   orderPlacedInLast10Days: client sets true when gather Order history has a placed date in the last 10 days (first welcome chip = order help).
+ *   If only `shoppingHistory` is sent (old client), it is used as the whole order block; browsing = none.
  * Returns { welcome: string } — personalized opening before chat.
  */
 app.post("/api/welcome", async (req, res) => {
@@ -57,15 +60,21 @@ app.post("/api/welcome", async (req, res) => {
       return;
     }
 
-    const {
-      parentProfile = "",
-      petProfile = "",
-      shoppingHistory = "",
-      firstTimeExperienceWithCai,
-      recentOrderWithin7Days,
-    } = req.body || {};
+    const b = req.body || {};
+    const { parentProfile = "", petProfile = "", firstTimeExperienceWithCai, orderPlacedInLast10Days } = b;
+    const oh = typeof b.orderHistory === "string" ? b.orderHistory : "";
+    const br = typeof b.browsingHistory === "string" ? b.browsingHistory : "";
+    const legacy = typeof b.shoppingHistory === "string" ? b.shoppingHistory : "";
+    let orderBlock = oh.trim();
+    let browseBlock = br.trim();
+    if (!orderBlock && !browseBlock && legacy.trim()) {
+      orderBlock = legacy.trim();
+    }
+    if (!orderBlock) orderBlock = "(none provided)";
+    orderBlock = orderBlockForLlmBundle(orderBlock);
+    if (!browseBlock) browseBlock = "(none provided)";
     const firstTime = normalizeFirstTimeExperienceWithCai(firstTimeExperienceWithCai);
-    const recentOrder = normalizeRecentOrderWithin7Days(recentOrderWithin7Days);
+    const orderIn10 = normalizeOrderPlacedInLast10Days(orderPlacedInLast10Days);
 
     const bundle = [
       "### Pet parent profile",
@@ -74,8 +83,11 @@ app.post("/api/welcome", async (req, res) => {
       "### Pet profile",
       petProfile.trim() || "(none provided)",
       "",
-      "### Shopping & browsing history",
-      shoppingHistory.trim() || "(none provided)",
+      "### Order history",
+      orderBlock,
+      "",
+      "### Browsing history",
+      browseBlock,
     ].join("\n");
 
     const openai = new OpenAI({ apiKey: key });
@@ -87,12 +99,12 @@ app.post("/api/welcome", async (req, res) => {
           role: "system",
           content: buildWelcomeSystemPrompt({
             firstTimeExperienceWithCai: firstTime,
-            recentOrderWithin7Days: recentOrder,
+            orderPlacedInLast10Days: orderIn10,
           }),
         },
         {
           role: "user",
-          content: `${firstTime ? "[[Session: FIRST-TIME with Cai — do not use welcome-back or returning-chatter phrasing.]]\n\n" : "[[Session: RETURNING — welcome-back tone is OK; do not re-introduce Cai from scratch.]]\n\n"}${recentOrder ? "[[Recent order within 7 days: ON — do not put “Get help with an order” in CHIPS; the app shows it first.]]\n\n" : ""}Context bundle for the welcome screen:\n\n${bundle}\n\nWrite Cai's welcome message now.`,
+          content: `${firstTime ? "[[Session: FIRST-TIME with Cai — do not use welcome-back or returning-chatter phrasing.]]\n\n" : "[[Session: RETURNING — welcome-back tone is OK; do not re-introduce Cai from scratch.]]\n\n"}${orderIn10 ? "[[Order in last 10 days: the app shows “Get help with an order” as the first welcome prompt chip. Do not put that exact phrase in your CHIPS line.]]\n\n" : ""}Context bundle for the welcome screen:\n\n${bundle}\n\nWrite Cai's welcome message now.`,
         },
       ],
       temperature: 0.75,
@@ -123,7 +135,11 @@ app.post("/api/chat", async (req, res) => {
       return;
     }
 
-    const { messages, context, orderHistory } = req.body || {};
+    const { messages, context, orderHistory: orderHistoryBody } = req.body || {};
+    let orderHistory = orderHistoryBody;
+    if (Array.isArray(orderHistory) && orderHistory.length > 0) {
+      orderHistory = await enrichOrderHistoryWithPdpData(orderHistory);
+    }
     if (!Array.isArray(messages) || messages.length === 0) {
       res.status(400).json({ error: "Expected body.messages as a non-empty array." });
       return;

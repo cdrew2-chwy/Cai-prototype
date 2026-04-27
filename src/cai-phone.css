@@ -304,6 +304,25 @@
   width: 100%;
 }
 
+/* Figma 1117:13599 — emphasized first sentence + Text-2 body (welcome uses 12px lead → body) */
+.cai-msg-ai-body-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  gap: 12px;
+}
+
+.cai-msg-ai-lead {
+  white-space: pre-wrap;
+  width: 100%;
+}
+
+.cai-msg-ai-body-rest {
+  white-space: pre-wrap;
+  width: 100%;
+}
+
 .cai-msg-ai-body--muted {
   color: var(--color-text-secondary);
 }

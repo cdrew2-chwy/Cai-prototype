@@ -1,6 +1,6 @@
 /**
- * Prototype: structured order rows live only in “Shopping & browsing history” in gather.
- * The BFF is simulated by an optional `###` block; the app never invents rows.
+ * Prototype: structured order rows are embedded in the **Order history** bundle (gather form, optional Autoship per order).
+ * The BFF is simulated by a `### Structured order history (prototype)` block; the app never invents rows.
  */
 
 export type PrototypeOrderRow = {
@@ -12,6 +12,8 @@ export type PrototypeOrderRow = {
   /** ISO date (server applies last-6-months rule). */
   placedAt: string;
   imageUrl?: string;
+  /** When true, this order is on Autoship (from gather; copied into `meta` for the model). */
+  autoship?: boolean;
 };
 
 /** Shown in gather; only this block (or a whole-JSON array) is parsed for `/api/chat` `orderHistory`. */
@@ -31,7 +33,9 @@ function tryParseOrderArray(data: unknown): PrototypeOrderRow[] {
     const meta = typeof o.meta === "string" && o.meta.trim() ? o.meta.trim() : undefined;
     const status = typeof o.status === "string" && o.status.trim() ? o.status.trim() : undefined;
     const imageUrl = typeof o.imageUrl === "string" && o.imageUrl.trim() ? o.imageUrl.trim() : undefined;
-    out.push({ id, orderNumber, summary, meta, status, placedAt, imageUrl });
+    const base: PrototypeOrderRow = { id, orderNumber, summary, meta, status, placedAt, imageUrl };
+    if (o.autoship === true) base.autoship = true;
+    out.push(base);
   }
   return out;
 }
@@ -68,7 +72,7 @@ function findArraySpanEnd(s: string, startIdx: number): number {
 
 /**
  * Strips the structured order block (marker + following JSON array) for the model context bundle.
- * Free-text “shopping & browsing” above the block is kept.
+ * Free-text above the block (in **Order history**) is kept in model context (after strip).
  */
 export function stripStructuredOrderBlockFromShoppingText(text: string): string {
   const raw = text ?? "";

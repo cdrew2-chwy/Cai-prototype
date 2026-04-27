@@ -1,7 +1,7 @@
 /*
- * Order help — Figma 3277:28045 (list) & 3279:29189 (order card: thumb + Order # + pill + subline).
- * https://www.figma.com/design/A3nyvH8N2Gx62Wfxs9opoS/CAI---Phase-3---Evolution?node-id=3279-29189
- * Card: white, inner padding, soft shadow, square thumb 4px radius, status pill light grey, date beside pill.
+ * Order help — Figma 3277:28045 (list) & 3285:29258 (order card: image + Order # + status + date, no product title).
+ * https://www.figma.com/design/A3nyvH8N2Gx62Wfxs9opoS/CAI---Phase-3---Evolution?node-id=3285-29258
+ * Card: white, inner padding, soft shadow, square thumb 4px radius, delivered pill + “Arrived …” date.
  */
 
 .cai-recommendation-section .cai-order-showcase {
@@ -42,17 +42,17 @@
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 14px;
+  gap: 4px;
   min-width: 0;
-  padding: 12px 14px;
+  padding: 12px;
   box-sizing: border-box;
 }
 
 /* Square thumbnail — 4px corner radius (Figma), not full-bleed */
 .cai-order-card__thumb {
-  flex: 0 0 64px;
-  width: 64px;
-  height: 64px;
+  flex: 0 0 56px;
+  width: 56px;
+  height: 56px;
   border-radius: 4px;
   overflow: hidden;
   background: #e8e8e8;
@@ -63,7 +63,8 @@
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center;
 }
 
 .cai-order-card__thumb-fallback {
@@ -95,9 +96,9 @@
   margin: 0;
   width: 100%;
   font-family: var(--typography-text-typeface, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
-  font-size: 16px;
-  line-height: 22px;
-  font-weight: 700;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
   color: var(--cai-order-title);
   letter-spacing: -0.01em;
 }
@@ -138,7 +139,18 @@
 }
 
 .cai-order-card__pill--delivered {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   background: #e8f5e9;
+  color: #1b5e20;
+}
+
+.cai-order-card__delivered-check {
+  display: inline-flex;
+  flex-shrink: 0;
+  line-height: 0;
+  vertical-align: middle;
   color: #1b5e20;
 }
 
@@ -154,21 +166,6 @@
   line-height: 20px;
   font-weight: 400;
   color: var(--cai-order-sub);
-}
-
-/* Optional: line item copy when BFF sends it (Figma comp is image + title rows only) */
-.cai-order-card__line-items {
-  margin: 2px 0 0;
-  width: 100%;
-  font-size: 13px;
-  line-height: 18px;
-  font-weight: 400;
-  color: var(--color-text-secondary, #4b5563);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  word-break: break-word;
 }
 
 .cai-order-load-more {

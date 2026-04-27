@@ -37,6 +37,57 @@ export function stripWelcomeMarkdownBold(text: string): string {
   return text.replace(/\*\*/g, "");
 }
 
+/**
+ * Split assistant prose into an emphasized first sentence (Figma 1117:13599 Editorial / Heading-1-Stronger)
+ * and the remainder as body copy. Handles `...` and optional closing quotes before whitespace or end.
+ */
+export function splitFirstSentence(text: string): { lead: string; rest: string } {
+  const s = text;
+  if (!s) return { lead: "", rest: "" };
+
+  let i = 0;
+  const n = s.length;
+  while (i < n) {
+    const ch = s[i];
+    if (ch === "." || ch === "!" || ch === "?") {
+      let j = i;
+      if (ch === ".") {
+        while (j < n && s[j] === ".") j++;
+        const runLen = j - i;
+        const beforeDot = i > 0 ? s[i - 1] : "";
+        const afterRun = j < n ? s[j] : "";
+        if (runLen === 1 && /\d/.test(beforeDot) && /\d/.test(afterRun)) {
+          i = j;
+          continue;
+        }
+      } else {
+        j = i + 1;
+      }
+      let k = j;
+      while (
+        k < n &&
+        (s[k] === '"' ||
+          s[k] === "'" ||
+          s[k] === ")" ||
+          s[k] === "]" ||
+          s[k] === "\u201d" ||
+          s[k] === "\u2019")
+      ) {
+        k++;
+      }
+      if (k === n || /\s/.test(s[k] ?? "")) {
+        const lead = s.slice(0, k).trimEnd();
+        const rest = s.slice(k).trimStart();
+        return { lead, rest };
+      }
+      i = ch === "." ? j : i + 1;
+      continue;
+    }
+    i++;
+  }
+  return { lead: s, rest: "" };
+}
+
 /** Spaced em/en dashes often read stiff; prefer a comma in displayed assistant prose. */
 function relaxConversationalDashes(text: string): string {
   return text.replace(/ — /g, ", ").replace(/ – /g, ", ");
@@ -134,7 +185,7 @@ export type CaiOrderItem = {
   meta?: string;
   status?: string;
   placedAt?: string;
-  /** When set, shown in the leading 64px tile; otherwise a package placeholder is used. */
+  /** When set, shown in the leading 56px tile; otherwise a package placeholder is used. */
   imageUrl?: string;
 };
 
@@ -430,6 +481,7 @@ export type ParsedAssistantMessage = {
    * other care ideas). Rendered **after** the vet card, before product cards.
    */
   bodyAfterVet?: string;
+  /** Suggestion chips; always empty when {@link orders} is set (parent must tap an order card first). */
   chips: string[];
   products: CaiProductsBlock | null;
   /** Order cards from ```cai-orders``` (order help / returns / tracking). */
@@ -641,6 +693,7 @@ function splitRecommendationProse(bodyFull: string, beforeFence: string): { lead
 
 /**
  * Assistant replies: optional ```cai-vet-ingress``` then optional ```cai-orders``` then optional ```cai-products``` JSON, then CHIPS.
+ * When ```cai-orders``` is present, parsed **chips** are always empty (UI: no suggestion chips until the parent selects an order card).
  * With vet ingress, {@link ParsedAssistantMessage.body} is prose **before** the vet fence only; {@link ParsedAssistantMessage.bodyAfterVet}
  * is bridge / other-care prose after the vet card, before orders/products.
  */
@@ -651,7 +704,7 @@ export function parseAssistantMessage(content: string): ParsedAssistantMessage {
   const { textWithoutFence, jsonText, beforeFence } = extractCaiProductsFence(ordersEx.textWithoutFence);
   const orders = ordersEx.jsonText ? parseCaiOrdersJson(ordersEx.jsonText) : null;
   const products = jsonText ? parseCaiProductsJson(jsonText) : null;
-  const chips = chipsFromAssistantContent(content);
+  const chips = orders ? [] : chipsFromAssistantContent(content);
   const beforeFenceTrim = beforeFence.trim();
 
   let displayVetCardIntro = vetCardIntro;
@@ -726,41 +779,44 @@ export function parseAssistantMessage(content: string): ParsedAssistantMessage {
 /** Always last on the welcome screen — human escalation (Chewy customer care). */
 export const CUSTOMER_CARE_WELCOME_CHIP = "Chat live with customer care";
 
-/** First chip when the pet parent placed or received an order in the last 7 days (product rule). */
+/** Suggested first prompt for order help; the welcome UI may prepend it when gather has an order placed in the last 10 days. */
 export const RECENT_ORDER_WELCOME_CHIP = "Get help with an order";
 
 export type FinalizeWelcomeChipsOptions = {
-  /** When true, {@link RECENT_ORDER_WELCOME_CHIP} is prepended first; customer care stays last. */
-  recentOrderWithin7Days?: boolean;
+  /**
+   * Set when gather Order history has a placed date in the last 10 days: prepends
+   * {@link RECENT_ORDER_WELCOME_CHIP} and strips the same label from the model to avoid duplicate.
+   */
+  getHelpWithOrderFirst?: boolean;
 };
 
 /**
- * Welcome UI only: strips reserved labels from the model list, optionally prepends the recent-order
- * chip, keeps up to the remaining slots for model chips, then appends {@link CUSTOMER_CARE_WELCOME_CHIP}
- * as the final chip (max {@code maxTotal} chips).
+ * Welcome UI: optionally prepends “Get help with an order” first, drops duplicate customer care from
+ * the model, fills remaining slots, appends customer care last (max {@code maxTotal} chips).
  */
 export function finalizeWelcomeChips(
   chips: string[],
   maxTotal = 4,
   options?: FinalizeWelcomeChipsOptions
 ): string[] {
+  const getHelp = Boolean(options?.getHelpWithOrderFirst);
   const care = CUSTOMER_CARE_WELCOME_CHIP;
   const orderHelp = RECENT_ORDER_WELCOME_CHIP;
   const norm = (s: string) => s.trim().toLowerCase();
-  const recent = Boolean(options?.recentOrderWithin7Days);
 
   const rest = chips.filter((c) => {
     const k = norm(c);
-    return k !== norm(care) && k !== norm(orderHelp);
+    if (k === norm(care)) return false;
+    if (getHelp && k === norm(orderHelp)) return false;
+    return true;
   });
 
-  const fixedStart = recent ? 1 : 0;
-  const roomForModel = Math.max(0, maxTotal - fixedStart - 1);
+  const startSlots = getHelp ? 1 : 0;
+  const roomForModel = Math.max(0, maxTotal - startSlots - 1);
   const modelSlice = rest.slice(0, roomForModel);
 
   const out: string[] = [];
-  if (recent) out.push(orderHelp);
-  out.push(...modelSlice);
-  out.push(care);
+  if (getHelp) out.push(orderHelp);
+  out.push(...modelSlice, care);
   return out;
 }

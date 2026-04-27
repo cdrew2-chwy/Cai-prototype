@@ -1,6 +1,7 @@
 /**
- * Prototype: when the parent asks for order help and the client sends `orderHistory` (parsed from
- * “Shopping & browsing history” in gather), ensure the reply includes a ```cai-orders``` fence the UI
+ * Prototype: when the parent asks for order help and the client sends `orderHistory` (from gather),
+ * the API may have enriched `summary` + `imageUrl` from Chewy PDPs (`chewyPdpEnrich.js`) when `summary` was
+ * a `https://www.chewy.com/...` link. This module ensures the reply includes a ```cai-orders``` fence the UI
  * can render (Figma CAI Phase 3 order cards). No rows are invented server-side.
  */
 
@@ -39,7 +40,6 @@ export function buildCaiOrdersFenceJson(orderHistory) {
   const filtered = ordersInLastSixMonths(orderHistory);
   const showLoadMore = filtered.length > 3;
   const payload = {
-    heading: "Your recent orders",
     orders: filtered,
     showLoadMore,
   };

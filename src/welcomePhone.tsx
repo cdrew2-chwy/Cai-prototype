@@ -88,18 +88,18 @@ export function WelcomePhoneContent({
   text,
   onPromptSelect,
   promptsDisabled = false,
-  recentOrderWithin7Days = false,
+  getHelpWithOrderFirst = false,
 }: {
   text: string;
   /** When set, prompts use the Figma 3065:29722 chip control and submit this label. */
   onPromptSelect?: (label: string) => void;
   promptsDisabled?: boolean;
-  /** Pet parent placed or received an order in the last 7 days — first chip becomes order help. */
-  recentOrderWithin7Days?: boolean;
+  /** When true, an order in gather was placed in the last 10 days; first chip is “Get help with an order.” */
+  getHelpWithOrderFirst?: boolean;
 }) {
   const stripped = stripWelcomeMarkdownBold(text);
   const { body, chips } = parseChips(stripped);
-  const welcomeChips = finalizeWelcomeChips(chips, MAX_WELCOME_PROMPTS, { recentOrderWithin7Days });
+  const welcomeChips = finalizeWelcomeChips(chips, MAX_WELCOME_PROMPTS, { getHelpWithOrderFirst });
   const main = (body || stripped).trim();
   const blocks = main.split(/\n\n+/).map((b) => b.trim()).filter(Boolean);
   const first = blocks[0] ?? "";

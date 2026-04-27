@@ -3,6 +3,7 @@ import { CaiOrderShowcase } from "./CaiOrderShowcase";
 import { CaiProductShowcase } from "./CaiProductShowcase";
 import type { ChatMessage } from "./chatUtils";
 import { ConnectWithVetIngressCard } from "./ConnectWithVetIngressCard";
+import { CaiAssistantLeadContent } from "./CaiAssistantLeadContent";
 import { formatChatTimestamp, parseAssistantMessage } from "./chatUtils";
 import { WelcomePhoneContent } from "./welcomePhone";
 
@@ -12,8 +13,8 @@ type Props = {
   messages: ChatMessage[];
   /** Figma 3177:61059 — timestamp row name (from pet parent profile). */
   petParentName: string;
-  /** When true, welcome chips lead with “Get help with an order”. */
-  recentOrderWithin7Days?: boolean;
+  /** When true, welcome’s first prompt chip is order help (gather had an order placed in the last 10 days). */
+  getHelpWithOrderFirst?: boolean;
   onChipSelect: (text: string) => void;
   chatLoading: boolean;
   bottomRef: RefObject<HTMLDivElement | null>;
@@ -26,7 +27,7 @@ export function CaiPhoneThread({
   welcomeText,
   messages,
   petParentName,
-  recentOrderWithin7Days = false,
+  getHelpWithOrderFirst = false,
   onChipSelect,
   chatLoading,
   bottomRef,
@@ -39,7 +40,7 @@ export function CaiPhoneThread({
         <section className="cai-thread-welcome" aria-label="Welcome">
           <WelcomePhoneContent
             text={welcomeText}
-            recentOrderWithin7Days={recentOrderWithin7Days}
+            getHelpWithOrderFirst={getHelpWithOrderFirst}
             onPromptSelect={onChipSelect}
             promptsDisabled={chatLoading}
           />
@@ -73,21 +74,21 @@ export function CaiPhoneThread({
           vetCardIntro,
         } = parseAssistantMessage(m.content);
         const sectionTitle = products?.heading?.trim() || "Recommendation";
-        const ordersSectionTitle = orders?.heading?.trim() || "Your recent orders";
+        const ordersSectionTitle = orders?.heading?.trim();
         return (
           <div key={`a-${i}`} className="cai-msg-ai">
-            {body.trim() ? (
-              <div className="cai-msg-ai-body cai-text-editorial-text-2 cai-msg-ai-body--muted">{body}</div>
-            ) : null}
+            {body.trim() ? <CaiAssistantLeadContent text={body} variant="phone" /> : null}
             {vetIngress ? <ConnectWithVetIngressCard waitSeconds={vetWaitSeconds} intro={vetCardIntro} /> : null}
             {bodyAfterVet?.trim() ? (
-              <div className="cai-msg-ai-body cai-text-editorial-text-2 cai-msg-ai-body--muted cai-msg-ai-body-after-vet">
-                {bodyAfterVet}
+              <div className="cai-msg-ai-body-after-vet">
+                <CaiAssistantLeadContent text={bodyAfterVet} variant="phone" />
               </div>
             ) : null}
             {orders ? (
               <section className="cai-recommendation-section" aria-label="Recent orders">
-                <h3 className="cai-recommendation-section__title">{ordersSectionTitle}</h3>
+                {ordersSectionTitle ? (
+                  <h3 className="cai-recommendation-section__title">{ordersSectionTitle}</h3>
+                ) : null}
                 <CaiOrderShowcase block={orders} />
               </section>
             ) : null}

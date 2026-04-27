@@ -1,5 +1,6 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { apiUrl, readJson } from "./api";
+import { CaiAssistantLeadContent } from "./CaiAssistantLeadContent";
 import { CaiOrderShowcase } from "./CaiOrderShowcase";
 import { CaiPhoneScreen } from "./CaiPhoneScreen";
 import { CaiPhoneThread } from "./CaiPhoneThread";
@@ -19,32 +20,51 @@ import {
   parseOrderHistoryFromShoppingText,
   stripStructuredOrderBlockFromShoppingText,
 } from "./orderHistoryFromShopping";
+import {
+  GATHER_ORDER_STATUS_OPTIONS,
+  buildOrderHistoryString,
+  createEmptyGatherOrderField,
+  formEntriesToPrototypeRows,
+  hasOrderPlacedInLastNDays,
+  prototypeRowsToFormEntries,
+  type GatherOrderField,
+} from "./gatherOrderForm";
 import { getSessionPersona, SESSION_PERSONA_CUSTOM, SESSION_PERSONAS } from "./sessionPersonas";
 import "./App.css";
 
 type Phase = "gather" | "welcome" | "chat";
 
-function mergeSessionContext(parent: string, pet: string, shop: string) {
+/** Injected into ### Order history when the session has parseable order rows (kept in sync with `server/orderContextBundle.js`). */
+const ORDER_HISTORY_CARDS_ONLY_HINT = `The parent's recent order row(s) are shown as interactive order cards in this app when you include a \`cai-orders\` block. Do not list, bullet, number, or repeat individual orders, product names, URLs, or order dates in your replies—the cards and that fence are the only place for that detail.`;
+
+function mergeSessionContext(
+  parent: string,
+  pet: string,
+  orderHistoryText: string,
+  browsingHistoryText: string
+) {
   const p = parent.trim() || "(none provided)";
   const pe = pet.trim() || "(none provided)";
-  const stripped = stripStructuredOrderBlockFromShoppingText(shop).trim();
-  const orders = parseOrderHistoryFromShoppingText(shop);
-  let s: string;
-  if (stripped) s = stripped;
-  else if (orders.length > 0) {
-    s =
-      "Prototype: structured order rows (see order help in chat) are the only content in this block; add free-text story above the `###` section in gather if you want it here.";
+  const stripped = stripStructuredOrderBlockFromShoppingText(orderHistoryText).trim();
+  const orders = parseOrderHistoryFromShoppingText(orderHistoryText);
+  let orderBlock: string;
+  if (orders.length > 0) {
+    orderBlock = ORDER_HISTORY_CARDS_ONLY_HINT;
+  } else if (stripped) {
+    orderBlock = stripped;
   } else {
-    s = "(none provided)";
+    orderBlock = "(none provided)";
   }
-  return `### Pet parent profile\n${p}\n\n### Pet profile\n${pe}\n\n### Shopping & browsing history\n${s}`;
+  const browseBlock = browsingHistoryText.trim() || "(none provided)";
+  return `### Pet parent profile\n${p}\n\n### Pet profile\n${pe}\n\n### Order history\n${orderBlock}\n\n### Browsing history\n${browseBlock}`;
 }
 
 export default function App() {
   const [phase, setPhase] = useState<Phase>("gather");
   const [parentProfile, setParentProfile] = useState("");
   const [petProfile, setPetProfile] = useState("");
-  const [shoppingHistory, setShoppingHistory] = useState("");
+  const [orderEntries, setOrderEntries] = useState<GatherOrderField[]>(() => [createEmptyGatherOrderField()]);
+  const [browsingHistoryText, setBrowsingHistoryText] = useState("");
   const [context, setContext] = useState("");
   const [welcomeRaw, setWelcomeRaw] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -55,11 +75,15 @@ export default function App() {
   const [iphonePreview, setIphonePreview] = useState(false);
   /** Gather panel: on = first meeting + Cai may introduce themself; off = welcome back, no re-intro. */
   const [firstTimeExperienceWithCai, setFirstTimeExperienceWithCai] = useState(true);
-  /** Gather panel: order placed or received in last 7 days → welcome leads with “Get help with an order”. */
-  const [recentOrderWithin7Days, setRecentOrderWithin7Days] = useState(false);
   /** Gather: pre-filled persona vs typing your own (`sessionPersonas.ts`). */
   const [sessionPersonaId, setSessionPersonaId] = useState<string>(SESSION_PERSONA_CUSTOM);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+
+  /** From gather Order history: at least one row with product + placed date in the last 10 days. */
+  const getHelpWithOrderFirst = useMemo(
+    () => hasOrderPlacedInLastNDays(orderEntries, 10),
+    [orderEntries]
+  );
 
   function applySessionPersona(id: string) {
     if (id === SESSION_PERSONA_CUSTOM) {
@@ -71,10 +95,26 @@ export default function App() {
     setSessionPersonaId(id);
     setParentProfile(p.parentProfile);
     setPetProfile(p.petProfile);
-    setShoppingHistory(p.shoppingHistory);
-    if (typeof p.recentOrderWithin7Days === "boolean") {
-      setRecentOrderWithin7Days(p.recentOrderWithin7Days);
-    }
+    setOrderEntries(prototypeRowsToFormEntries(parseOrderHistoryFromShoppingText(p.orderHistory)));
+    setBrowsingHistoryText(p.browsingHistory);
+  }
+
+  function updateOrderField(
+    index: number,
+    patch: Partial<Pick<GatherOrderField, "productOrLink" | "placedDate" | "status" | "expectedDelivery" | "autoship">>
+  ) {
+    setSessionPersonaId(SESSION_PERSONA_CUSTOM);
+    setOrderEntries((rows) => rows.map((r, i) => (i === index ? { ...r, ...patch } : r)));
+  }
+
+  function addOrderRow() {
+    setSessionPersonaId(SESSION_PERSONA_CUSTOM);
+    setOrderEntries((rows) => (rows.length < 5 ? [...rows, createEmptyGatherOrderField()] : rows));
+  }
+
+  function removeOrderRow(index: number) {
+    setSessionPersonaId(SESSION_PERSONA_CUSTOM);
+    setOrderEntries((rows) => (rows.length <= 1 ? rows : rows.filter((_, i) => i !== index)));
   }
 
   useEffect(() => {
@@ -91,9 +131,10 @@ export default function App() {
         body: JSON.stringify({
           parentProfile,
           petProfile,
-          shoppingHistory,
+          orderHistory: buildOrderHistoryString(orderEntries),
+          browsingHistory: browsingHistoryText,
           firstTimeExperienceWithCai,
-          recentOrderWithin7Days,
+          orderPlacedInLast10Days: getHelpWithOrderFirst,
         }),
       });
       const data = await readJson<{ welcome?: string; error?: string }>(res);
@@ -110,7 +151,14 @@ export default function App() {
   }
 
   function startChatting() {
-    setContext(mergeSessionContext(parentProfile, petProfile, shoppingHistory));
+    setContext(
+      mergeSessionContext(
+        parentProfile,
+        petProfile,
+        buildOrderHistoryString(orderEntries),
+        browsingHistoryText
+      )
+    );
     setMessages([{ role: "assistant", content: welcomeRaw }]);
     setPhase("chat");
     setError(null);
@@ -128,7 +176,8 @@ export default function App() {
     setInput("");
     setError(null);
     setFirstTimeExperienceWithCai(true);
-    setRecentOrderWithin7Days(false);
+    setOrderEntries([createEmptyGatherOrderField()]);
+    setBrowsingHistoryText("");
   }
 
   async function sendUserText(text: string) {
@@ -148,7 +197,7 @@ export default function App() {
         body: JSON.stringify({
           messages: messagesForApi(nextMessages),
           context: context.trim() || undefined,
-          orderHistory: parseOrderHistoryFromShoppingText(shoppingHistory),
+          orderHistory: formEntriesToPrototypeRows(orderEntries),
         }),
       });
       const data = await readJson<{ reply?: string; error?: string }>(res);
@@ -207,10 +256,11 @@ export default function App() {
               Tell Cai about this session
             </h2>
             <p className="panel-lead">
-              Pick a <strong>preset persona</strong> to fill the fields, or choose <strong>Custom</strong> and paste or type
-              mock <strong>pet parent</strong>, <strong>pet</strong>, and <strong>shopping / browsing</strong> signals. In a
-              full app this would come from accounts and telemetry; here you supply it so the welcome can personalize.
-              Fields can be empty—Cai will still greet you and invite you in.
+              Pick a <strong>preset persona</strong> to fill the fields, or choose <strong>Custom</strong> and type
+              mock <strong>pet parent</strong> and <strong>pet</strong> profiles, structured <strong>order history</strong>{" "}
+              (or leave orders blank), and <strong>browsing</strong> signals. In a full app this would come from accounts and
+              telemetry; here you supply it so the welcome can personalize. Fields can be empty—Cai will still greet you and
+              invite you in.
             </p>
 
             <div className="field-block persona-picker" role="radiogroup" aria-labelledby="persona-picker-label">
@@ -218,7 +268,7 @@ export default function App() {
                 Session preset
               </p>
               <p className="label-hint" id="persona-picker-hint">
-                Selecting a persona replaces the three text areas below. Editing any field switches you to Custom.
+                Selecting a persona replaces the main text areas below. Editing any field switches you to Custom.
               </p>
               <div className="persona-options" aria-describedby="persona-picker-hint">
                 {SESSION_PERSONAS.map((p) => (
@@ -278,34 +328,6 @@ export default function App() {
               </div>
             </div>
 
-            <div className="field-block session-first-time-block">
-              <div className="session-first-time-row">
-                <div className="session-first-time-text">
-                  <p className="label" id="gather-recent-order-label">
-                    Recent order (last 7 days)
-                  </p>
-                  <p className="label-hint" id="gather-recent-order-hint">
-                    When on, the welcome screen shows <strong>Get help with an order</strong> as the first suggested chip
-                    (before other starters). In a full app this would come from order telemetry.
-                  </p>
-                </div>
-                <label className="session-switch" htmlFor="gather-recent-order-input">
-                  <input
-                    id="gather-recent-order-input"
-                    type="checkbox"
-                    className="session-switch-input"
-                    checked={recentOrderWithin7Days}
-                    onChange={(e) => setRecentOrderWithin7Days(e.target.checked)}
-                    aria-labelledby="gather-recent-order-label"
-                    aria-describedby="gather-recent-order-hint"
-                  />
-                  <span className="session-switch-track" aria-hidden>
-                    <span className="session-switch-thumb" />
-                  </span>
-                </label>
-              </div>
-            </div>
-
             {iphonePreview && (
               <p className="hint gather-phone-hint">
                 With <strong>iPhone preview</strong> on, these fields stay in the workbench; the phone shows the welcome
@@ -350,30 +372,162 @@ export default function App() {
                 />
               </div>
 
+              <div className="field-block" aria-describedby="order-history-hint">
+                <p className="label" id="order-history-label">
+                  Order history
+                </p>
+                <p className="label-hint" id="order-history-hint">
+                  Add up to five orders. Each order needs a <strong>product or PDP link</strong> and a <strong>placed date</strong> to
+                  drive in-thread <strong>order cards</strong> during order help. For a <strong>Chewy PDP URL</strong> (
+                  <code>https://www.chewy.com/…</code>), the demo API fetches the product name and image for the cards. Mark{" "}
+                  <strong>Autoship</strong> per order and add an                   optional <strong>expected delivery</strong> as needed. The{" "}
+                  <strong>structured</strong> JSON is generated automatically for the session bundle and order help. If
+                  a placed date falls in the <strong>last 10 days</strong>, the welcome screen prepends{" "}
+                  <strong>Get help with an order</strong> as the first prompt chip.
+                </p>
+
+                <div className="gather-orders" role="list">
+                  {orderEntries.map((ord, i) => (
+                    <div
+                      key={ord.id}
+                      className="gather-order"
+                      role="listitem"
+                      aria-labelledby={`order-block-title-${ord.id}`}
+                    >
+                      <div className="gather-order-header">
+                        <h3 className="gather-order-title" id={`order-block-title-${ord.id}`}>
+                          Order {i + 1}
+                        </h3>
+                        {orderEntries.length > 1 && (
+                          <button
+                            type="button"
+                            className="btn-text gather-order-remove"
+                            onClick={() => removeOrderRow(i)}
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="gather-order-grid">
+                        <div>
+                          <label className="label label--compact" htmlFor={`order-product-${ord.id}`}>
+                            Product name or exact Chewy link
+                          </label>
+                          <textarea
+                            id={`order-product-${ord.id}`}
+                            className="textarea"
+                            rows={2}
+                            placeholder="Product name or https://www.chewy.com/…"
+                            value={ord.productOrLink}
+                            onChange={(e) => updateOrderField(i, { productOrLink: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <label className="label label--compact" htmlFor={`order-date-${ord.id}`}>
+                            Order placed date
+                          </label>
+                          <input
+                            id={`order-date-${ord.id}`}
+                            className="input input--date"
+                            type="date"
+                            value={ord.placedDate}
+                            onChange={(e) => updateOrderField(i, { placedDate: e.target.value })}
+                          />
+                        </div>
+                        <div className="session-first-time-block gather-order-autoship-block">
+                          <div className="session-first-time-row">
+                            <div className="session-first-time-text">
+                              <p className="label label--compact" id={`order-autoship-label-${ord.id}`}>
+                                Autoship
+                              </p>
+                              <p className="label-hint" id={`order-autoship-hint-${ord.id}`}>
+                                On when this purchase is on Autoship; off for one-time orders.
+                              </p>
+                            </div>
+                            <label className="session-switch" htmlFor={`order-autoship-${ord.id}`}>
+                              <input
+                                id={`order-autoship-${ord.id}`}
+                                type="checkbox"
+                                className="session-switch-input"
+                                checked={ord.autoship}
+                                onChange={(e) => updateOrderField(i, { autoship: e.target.checked })}
+                                aria-labelledby={`order-autoship-label-${ord.id}`}
+                                aria-describedby={`order-autoship-hint-${ord.id}`}
+                              />
+                              <span className="session-switch-track" aria-hidden>
+                                <span className="session-switch-thumb" />
+                              </span>
+                            </label>
+                          </div>
+                        </div>
+                        <div className="gather-order-status-delivery">
+                          <div>
+                            <label className="label label--compact" htmlFor={`order-status-${ord.id}`}>
+                              Order status
+                            </label>
+                            <select
+                              id={`order-status-${ord.id}`}
+                              className="input input--select"
+                              value={ord.status}
+                              onChange={(e) => updateOrderField(i, { status: e.target.value })}
+                            >
+                              {GATHER_ORDER_STATUS_OPTIONS.map((opt) => (
+                                <option key={opt} value={opt}>
+                                  {opt}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="label label--compact" htmlFor={`order-expected-${ord.id}`}>
+                              Expected delivery (optional)
+                            </label>
+                            <input
+                              id={`order-expected-${ord.id}`}
+                              className="input"
+                              type="text"
+                              placeholder="e.g. Apr 25 or Friday"
+                              value={ord.expectedDelivery}
+                              onChange={(e) => updateOrderField(i, { expectedDelivery: e.target.value })}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="gather-orders-toolbar">
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={addOrderRow}
+                    disabled={orderEntries.length >= 5}
+                  >
+                    {orderEntries.length >= 5 ? "Maximum 5 orders" : "Add an order"}
+                  </button>
+                </div>
+              </div>
+
               <div className="field-block">
-                <label className="label" htmlFor="shop">
-                  Shopping &amp; browsing history
+                <label className="label" htmlFor="browsing-history">
+                  Browsing history
                 </label>
-                <p className="label-hint" id="shop-hint">
-                  Free-text: recent orders, saved items, categories browsed, brands clicked. For <strong>order help</strong> in
-                  chat, add an optional <strong>{`### Structured order history (prototype)`}</strong> block (JSON array with{" "}
-                  <code>orderNumber</code>, <code>summary</code>, <code>placedAt</code>, <code>status</code>, and optional{" "}
-                  <code>imageUrl</code> per row) at the end of this field, or a JSON array as the only content. The order
-                  card shows a status pill and &quot;Delivered on …&quot; / &quot;Arrives by …&quot; from <code>placedAt</code>,
-                  not Autoship/one-time <code>meta</code> lines. Cai only uses rows you supply. The structured block is
-                  stripped from the model bundle below so the reply does not repeat the same data twice.
+                <p className="label-hint" id="browsing-history-hint">
+                  Categories browsed, search queries, PDP views, and other non-order signals. Shipped in session context as{" "}
+                  <strong>### Browsing history</strong>.
                 </p>
                 <textarea
-                  id="shop"
+                  id="browsing-history"
                   className="textarea"
-                  rows={4}
-                  placeholder="Example: Recently viewed freeze-dried toppers; last order included litter and dental treats."
-                  value={shoppingHistory}
+                  rows={3}
+                  placeholder="Example: searched senior dog food; viewed orthopedic beds; saved freeze-dried toppers."
+                  value={browsingHistoryText}
                   onChange={(e) => {
                     setSessionPersonaId(SESSION_PERSONA_CUSTOM);
-                    setShoppingHistory(e.target.value);
+                    setBrowsingHistoryText(e.target.value);
                   }}
-                  aria-describedby="shop-hint"
+                  aria-describedby="browsing-history-hint"
                 />
               </div>
             </div>
@@ -407,7 +561,7 @@ export default function App() {
                   const welcomeClean = stripWelcomeMarkdownBold(welcomeRaw);
                   const { body, chips } = parseChips(welcomeClean);
                   const welcomeChips = finalizeWelcomeChips(chips, MAX_WELCOME_PROMPTS, {
-                    recentOrderWithin7Days,
+                    getHelpWithOrderFirst,
                   });
                   return (
                     <>
@@ -459,7 +613,7 @@ export default function App() {
                 onChange={(e) => setContext(e.target.value)}
               />
               <p className="hint">
-                Built from your three blocks when you clicked &quot;Start chatting.&quot; Cai receives this on every reply
+                Built from your four context blocks when you clicked &quot;Start chatting.&quot; Cai receives this on every reply
                 when it helps. It treats browsing and pasted context as hints, not certainty—and it won&apos;t push for pet
                 details until the parent asks about their pet.
               </p>
@@ -495,21 +649,29 @@ export default function App() {
                               vetCardIntro: undefined,
                             };
                       const sectionTitle = products?.heading?.trim() || "Recommendation";
-                      const ordersSectionTitle = orders?.heading?.trim() || "Your recent orders";
+                      const ordersSectionTitle = orders?.heading?.trim();
                       return (
                         <div key={i} className={`bubble-row ${m.role}`}>
                           <div className="bubble">
                             <div className="bubble-meta">{m.role === "user" ? "You" : "Cai"}</div>
-                            {body.trim() ? <div className="bubble-body">{body}</div> : null}
+                            {body.trim() ? (
+                              <div className="bubble-body">
+                                <CaiAssistantLeadContent text={body} variant="panel" />
+                              </div>
+                            ) : null}
                             {m.role === "assistant" && vetIngress ? (
                               <ConnectWithVetIngressCard waitSeconds={vetWaitSeconds} intro={vetCardIntro} />
                             ) : null}
                             {m.role === "assistant" && bodyAfterVet?.trim() ? (
-                              <div className="bubble-body cai-msg-ai-body-after-vet">{bodyAfterVet}</div>
+                              <div className="bubble-body cai-msg-ai-body-after-vet">
+                                <CaiAssistantLeadContent text={bodyAfterVet} variant="panel" />
+                              </div>
                             ) : null}
                             {m.role === "assistant" && orders ? (
                               <section className="cai-recommendation-section" aria-label="Recent orders">
-                                <h3 className="cai-recommendation-section__title">{ordersSectionTitle}</h3>
+                                {ordersSectionTitle ? (
+                                  <h3 className="cai-recommendation-section__title">{ordersSectionTitle}</h3>
+                                ) : null}
                                 <CaiOrderShowcase block={orders} />
                               </section>
                             ) : null}
@@ -601,7 +763,7 @@ export default function App() {
                     welcomeText={welcomeRaw}
                     messages={messages}
                     petParentName={extractPetParentDisplayName(parentProfile)}
-                    recentOrderWithin7Days={recentOrderWithin7Days}
+                    getHelpWithOrderFirst={getHelpWithOrderFirst}
                     onChipSelect={(t) => void sendUserText(t)}
                     chatLoading={chatLoading}
                     bottomRef={bottomRef}
@@ -610,7 +772,7 @@ export default function App() {
                   <PhoneWelcomePlaceholder />
                 )
               ) : welcomeRaw.trim() ? (
-                <WelcomePhoneContent text={welcomeRaw} recentOrderWithin7Days={recentOrderWithin7Days} />
+                <WelcomePhoneContent text={welcomeRaw} getHelpWithOrderFirst={getHelpWithOrderFirst} />
               ) : (
                 <PhoneWelcomePlaceholder />
               )}

@@ -5,22 +5,28 @@ import "./cai-order-cards.css";
 type Props = { block: CaiOrdersBlock };
 
 /**
- * Figma: order row in list — 3279:29189 (card layout / tap target).
- * https://www.figma.com/design/A3nyvH8N2Gx62Wfxs9opoS/CAI---Phase-3---Evolution?node-id=3279-29189
+ * Figma: order card — 3285:29258 (thumb + Order # + status + date; no product title on card).
+ * https://www.figma.com/design/A3nyvH8N2Gx62Wfxs9opoS/CAI---Phase-3---Evolution?node-id=3285-29258
  */
+
+/** Strip a single leading P from order id strings (e.g. gather form `#P123` → `123` on the card). */
+function stripLeadingPFromOrderId(segment: string): string {
+  return segment.replace(/^P/i, "");
+}
 
 /** "Order # 1234566789" style per Figma (one space after #, bold title line). */
 function formatOrderNumberLabel(raw: string): string {
   const t = raw.trim();
   if (/^order\s*#/i.test(t)) {
     const m = t.match(/^order\s*#\s*(.*)$/i);
-    const n = m?.[1]?.trim() ?? "";
+    const n = stripLeadingPFromOrderId(m?.[1]?.trim() ?? "");
     return n ? `Order # ${n}` : t;
   }
   if (t.startsWith("#")) {
-    return `Order # ${t.replace(/^#+\s*/, "").trim()}`;
+    const afterHash = stripLeadingPFromOrderId(t.replace(/^#+\s*/, "").trim());
+    return `Order # ${afterHash}`;
   }
-  return `Order # ${t}`;
+  return `Order # ${stripLeadingPFromOrderId(t)}`;
 }
 
 const WEEK3 = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
@@ -43,6 +49,9 @@ type StatusKind = "delivered" | "in_transit" | "closed" | "other";
 
 function getStatusKindFromString(status: string | undefined): StatusKind {
   const t = status?.toLowerCase() ?? "";
+  if (t === "processing") {
+    return "other";
+  }
   if (/\b(cancel|refund)\b/.test(t) || t.includes("canceled") || t.includes("cancelled")) {
     return "closed";
   }
@@ -50,7 +59,9 @@ function getStatusKindFromString(status: string | undefined): StatusKind {
     return "delivered";
   }
   if (
-    /\b(ship|transit|in transit|in-transit|process|processing|out for|pack|pending|shipped)\b/.test(t)
+    /\b(ship|transit|in transit|in-transit|process|processing|out for|pack|pending|shipped|delay|delayed)\b/.test(
+      t
+    )
   ) {
     return "in_transit";
   }
@@ -62,15 +73,15 @@ function getStatusKind(o: CaiOrderItem): StatusKind {
 }
 
 /**
- * Figma: delivered → "Delivered on Wed, Apr 5"; in transit → "Arrives by Wed, Apr 5".
- * Does not render `meta` (no Autoship / one-time copy on the card).
+ * Figma: delivered → "Arrived Wed, Apr 5" (date beside the status pill, no product name line).
+ * Does not render `summary` (product/line list) or `meta` on the card.
  */
 function getStatusDateCaption(o: CaiOrderItem): string {
   if (!o.placedAt?.trim()) return "";
   const d = formatFigmaOrderDate(o.placedAt);
   if (!d) return "";
   const kind = getStatusKind(o);
-  if (kind === "delivered") return `Delivered on ${d}`;
+  if (kind === "delivered") return `Arrived ${d}`;
   if (kind === "in_transit") return `Arrives by ${d}`;
   if (kind === "closed") return `Canceled on ${d}`;
   return `Placed on ${d}`;
@@ -84,7 +95,10 @@ function normalizePillStatus(status: string | undefined): string {
   if (!t) return "Status";
   const kind = getStatusKindFromString(status);
   if (kind === "delivered") return "Delivered";
-  if (kind === "in_transit") return "In transit";
+  if (kind === "in_transit") {
+    if (/\bdelay|delayed\b/i.test(t)) return "Delayed";
+    return "In transit";
+  }
   if (kind === "closed") return "Canceled";
   return t;
 }
@@ -98,6 +112,23 @@ function orderStatusPillClassKind(o: CaiOrderItem): string {
   if (k === "closed") return "cai-order-card__pill cai-order-card__pill--closed";
   if (k === "in_transit") return "cai-order-card__pill cai-order-card__pill--in_transit";
   return "cai-order-card__pill cai-order-card__pill--default";
+}
+
+function DeliveredPillCheckIcon() {
+  return (
+    <span className="cai-order-card__delivered-check" aria-hidden>
+      <svg viewBox="0 0 16 16" width="16" height="16" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="8" cy="8" r="8" fill="currentColor" />
+        <path
+          d="M4.2 8.1 6.4 10.2 11.5 4.5"
+          stroke="#fff"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </span>
+  );
 }
 
 function OrderTileIcon() {
@@ -141,6 +172,7 @@ function OrderTileIcon() {
 }
 
 function OrderCardRow({ o }: { o: CaiOrderItem }) {
+  const kind = getStatusKind(o);
   const dateCaption = getStatusDateCaption(o);
   const hasStatusPill = Boolean(o.status?.trim());
   const pillText = hasStatusPill ? normalizePillStatus(o.status) : "";
@@ -154,8 +186,8 @@ function OrderCardRow({ o }: { o: CaiOrderItem }) {
               className="cai-order-card__thumb-img"
               src={o.imageUrl}
               alt=""
-              width={64}
-              height={64}
+              width={56}
+              height={56}
               loading="lazy"
               decoding="async"
             />
@@ -169,11 +201,15 @@ function OrderCardRow({ o }: { o: CaiOrderItem }) {
           <p className="cai-order-card__title">{formatOrderNumberLabel(o.orderNumber)}</p>
           {dateCaption || hasStatusPill ? (
             <div className="cai-order-card__status-line">
-              {hasStatusPill ? <span className={orderStatusPillClassKind(o)}>{pillText}</span> : null}
+              {hasStatusPill ? (
+                <span className={orderStatusPillClassKind(o)}>
+                  {kind === "delivered" ? <DeliveredPillCheckIcon /> : null}
+                  {pillText}
+                </span>
+              ) : null}
               {dateCaption ? <span className="cai-order-card__date-line">{dateCaption}</span> : null}
             </div>
           ) : null}
-          {o.summary?.trim() ? <p className="cai-order-card__line-items">{o.summary}</p> : null}
         </div>
       </div>
     </li>
