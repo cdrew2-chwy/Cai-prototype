@@ -1,6 +1,8 @@
 import type { RefObject } from "react";
+import { CaiOrderShowcase } from "./CaiOrderShowcase";
 import { CaiProductShowcase } from "./CaiProductShowcase";
 import type { ChatMessage } from "./chatUtils";
+import { ConnectWithVetIngressCard } from "./ConnectWithVetIngressCard";
 import { formatChatTimestamp, parseAssistantMessage } from "./chatUtils";
 import { WelcomePhoneContent } from "./welcomePhone";
 
@@ -59,12 +61,35 @@ export function CaiPhoneThread({
             </div>
           );
         }
-        const { body, chips, products, recommendationRationale } = parseAssistantMessage(m.content);
+        const {
+          body,
+          bodyAfterVet,
+          chips,
+          products,
+          orders,
+          recommendationRationale,
+          vetIngress,
+          vetWaitSeconds,
+          vetCardIntro,
+        } = parseAssistantMessage(m.content);
         const sectionTitle = products?.heading?.trim() || "Recommendation";
+        const ordersSectionTitle = orders?.heading?.trim() || "Your recent orders";
         return (
           <div key={`a-${i}`} className="cai-msg-ai">
             {body.trim() ? (
               <div className="cai-msg-ai-body cai-text-editorial-text-2 cai-msg-ai-body--muted">{body}</div>
+            ) : null}
+            {vetIngress ? <ConnectWithVetIngressCard waitSeconds={vetWaitSeconds} intro={vetCardIntro} /> : null}
+            {bodyAfterVet?.trim() ? (
+              <div className="cai-msg-ai-body cai-text-editorial-text-2 cai-msg-ai-body--muted cai-msg-ai-body-after-vet">
+                {bodyAfterVet}
+              </div>
+            ) : null}
+            {orders ? (
+              <section className="cai-recommendation-section" aria-label="Recent orders">
+                <h3 className="cai-recommendation-section__title">{ordersSectionTitle}</h3>
+                <CaiOrderShowcase block={orders} />
+              </section>
             ) : null}
             {products ? (
               <section className="cai-recommendation-section" aria-label="Product recommendation">

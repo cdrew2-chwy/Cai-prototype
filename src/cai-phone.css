@@ -308,11 +308,46 @@
   color: var(--color-text-secondary);
 }
 
+.cai-msg-ai-body-after-vet {
+  margin-top: 12px;
+}
+
+/* Connect with a Vet — exact Figma SVG card (3253:113641) + prototype wait line */
+.cai-vet-ingress {
+  width: 100%;
+  max-width: 358px;
+  margin-top: 12px;
+}
+
+.cai-vet-ingress__intro {
+  margin: 0 0 10px;
+  color: var(--color-text-secondary);
+  white-space: pre-wrap;
+}
+
+.cai-vet-ingress__card {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+}
+
+.cai-vet-ingress__wait {
+  margin: 8px 0 0;
+  font-family: var(--typography-text-typeface);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
 .cai-msg-ai-chips {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 12px;
+  margin-top: 14px;
 }
 
 .cai-prompt-chip {

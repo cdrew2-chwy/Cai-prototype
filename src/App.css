@@ -346,6 +346,49 @@
   color: #94a3b8;
 }
 
+.persona-picker .persona-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-top: 0.35rem;
+}
+
+.persona-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  cursor: pointer;
+  font-size: 0.92rem;
+  line-height: 1.35;
+  color: #0f172a;
+}
+
+.persona-option:hover {
+  border-color: #cbd5e1;
+  background: #f1f5f9;
+}
+
+.persona-option input {
+  margin-top: 0.2rem;
+  flex-shrink: 0;
+  accent-color: var(--color-ui-bg-brand-primary, #1c49c2);
+}
+
+/* 32px vertical rhythm (16 + 16) around a 0.5px rule between session preset and session toggles */
+.gather-session-divider {
+  margin-top: 16px;
+  margin-bottom: 16px;
+}
+
+.gather-session-divider__line {
+  height: 0.5px;
+  background: #cbd5e1;
+}
+
 .actions-row {
   margin-top: 1rem;
   display: flex;
@@ -547,11 +590,43 @@
   font-size: 0.95rem;
 }
 
+.thread .cai-vet-ingress {
+  width: 100%;
+  max-width: 358px;
+  margin-top: 0.65rem;
+}
+
+.thread .cai-vet-ingress__intro {
+  margin: 0 0 0.5rem;
+  color: #475569;
+  white-space: pre-wrap;
+}
+
+.thread .cai-vet-ingress__card {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+}
+
+.thread .cai-vet-ingress__wait {
+  margin: 0.45rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  font-weight: 500;
+  color: #64748b;
+  text-align: center;
+}
+
 .inline-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
-  margin-top: 0.55rem;
+  margin-top: 0.75rem;
+}
+
+.thread .bubble-body.cai-msg-ai-body-after-vet {
+  margin-top: 0.45rem;
 }
 
 .chip {

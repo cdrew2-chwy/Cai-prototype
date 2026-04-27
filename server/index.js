@@ -10,6 +10,9 @@ import {
   normalizeFirstTimeExperienceWithCai,
   normalizeRecentOrderWithin7Days,
 } from "./welcomePrompt.js";
+import { ensureVetIngressInReply } from "./vetIngressGuard.js";
+import { ensureVetAlternatePathChips } from "./vetFollowUpChipsGuard.js";
+import { ensureOrderCardsInReply } from "./orderHelpGuard.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Load .env from project root (parent of /server)
@@ -106,7 +109,7 @@ app.post("/api/welcome", async (req, res) => {
 
 /**
  * POST /api/chat
- * Body: { messages: { role: 'user'|'assistant', content: string }[], context?: string }
+ * Body: { messages: { role: 'user'|'assistant', content: string }[], context?: string, orderHistory?: unknown[] }
  * Prototype: plain text only. In the Chewy app, pair replies with verified product payloads and
  * in-app cart / checkout / return handlers (see file header above).
  */
@@ -120,10 +123,18 @@ app.post("/api/chat", async (req, res) => {
       return;
     }
 
-    const { messages, context } = req.body || {};
+    const { messages, context, orderHistory } = req.body || {};
     if (!Array.isArray(messages) || messages.length === 0) {
       res.status(400).json({ error: "Expected body.messages as a non-empty array." });
       return;
+    }
+
+    let latestUserText = "";
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i]?.role === "user" && typeof messages[i]?.content === "string") {
+        latestUserText = messages[i].content;
+        break;
+      }
     }
 
     const openai = new OpenAI({ apiKey: key });
@@ -139,7 +150,17 @@ app.post("/api/chat", async (req, res) => {
       temperature: 0.7,
     });
 
-    const reply = completion.choices[0]?.message?.content ?? "";
+    const rawReply = completion.choices[0]?.message?.content ?? "";
+    const contextStr = typeof context === "string" ? context : "";
+    const reply = ensureOrderCardsInReply(
+      ensureVetAlternatePathChips(
+        ensureVetIngressInReply(rawReply, latestUserText),
+        contextStr,
+        latestUserText,
+      ),
+      latestUserText,
+      orderHistory,
+    );
     res.json({ reply });
   } catch (err) {
     console.error(err);

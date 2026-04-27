@@ -1,8 +1,10 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { apiUrl, readJson } from "./api";
+import { CaiOrderShowcase } from "./CaiOrderShowcase";
 import { CaiPhoneScreen } from "./CaiPhoneScreen";
 import { CaiPhoneThread } from "./CaiPhoneThread";
 import type { ChatMessage } from "./chatUtils";
+import { ConnectWithVetIngressCard } from "./ConnectWithVetIngressCard";
 import { CaiProductShowcase } from "./CaiProductShowcase";
 import {
   extractPetParentDisplayName,
@@ -13,6 +15,11 @@ import {
   stripWelcomeMarkdownBold,
 } from "./chatUtils";
 import { MAX_WELCOME_PROMPTS, PhoneWelcomePlaceholder, WelcomePhoneContent } from "./welcomePhone";
+import {
+  parseOrderHistoryFromShoppingText,
+  stripStructuredOrderBlockFromShoppingText,
+} from "./orderHistoryFromShopping";
+import { getSessionPersona, SESSION_PERSONA_CUSTOM, SESSION_PERSONAS } from "./sessionPersonas";
 import "./App.css";
 
 type Phase = "gather" | "welcome" | "chat";
@@ -20,7 +27,16 @@ type Phase = "gather" | "welcome" | "chat";
 function mergeSessionContext(parent: string, pet: string, shop: string) {
   const p = parent.trim() || "(none provided)";
   const pe = pet.trim() || "(none provided)";
-  const s = shop.trim() || "(none provided)";
+  const stripped = stripStructuredOrderBlockFromShoppingText(shop).trim();
+  const orders = parseOrderHistoryFromShoppingText(shop);
+  let s: string;
+  if (stripped) s = stripped;
+  else if (orders.length > 0) {
+    s =
+      "Prototype: structured order rows (see order help in chat) are the only content in this block; add free-text story above the `###` section in gather if you want it here.";
+  } else {
+    s = "(none provided)";
+  }
   return `### Pet parent profile\n${p}\n\n### Pet profile\n${pe}\n\n### Shopping & browsing history\n${s}`;
 }
 
@@ -41,7 +57,25 @@ export default function App() {
   const [firstTimeExperienceWithCai, setFirstTimeExperienceWithCai] = useState(true);
   /** Gather panel: order placed or received in last 7 days → welcome leads with “Get help with an order”. */
   const [recentOrderWithin7Days, setRecentOrderWithin7Days] = useState(false);
+  /** Gather: pre-filled persona vs typing your own (`sessionPersonas.ts`). */
+  const [sessionPersonaId, setSessionPersonaId] = useState<string>(SESSION_PERSONA_CUSTOM);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+
+  function applySessionPersona(id: string) {
+    if (id === SESSION_PERSONA_CUSTOM) {
+      setSessionPersonaId(SESSION_PERSONA_CUSTOM);
+      return;
+    }
+    const p = getSessionPersona(id);
+    if (!p) return;
+    setSessionPersonaId(id);
+    setParentProfile(p.parentProfile);
+    setPetProfile(p.petProfile);
+    setShoppingHistory(p.shoppingHistory);
+    if (typeof p.recentOrderWithin7Days === "boolean") {
+      setRecentOrderWithin7Days(p.recentOrderWithin7Days);
+    }
+  }
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -114,6 +148,7 @@ export default function App() {
         body: JSON.stringify({
           messages: messagesForApi(nextMessages),
           context: context.trim() || undefined,
+          orderHistory: parseOrderHistoryFromShoppingText(shoppingHistory),
         }),
       });
       const data = await readJson<{ reply?: string; error?: string }>(res);
@@ -172,10 +207,48 @@ export default function App() {
               Tell Cai about this session
             </h2>
             <p className="panel-lead">
-              Paste or type mock <strong>pet parent</strong>, <strong>pet</strong>, and <strong>shopping / browsing</strong>{" "}
-              signals. In a full app this would come from accounts and telemetry; here you supply it so the welcome can
-              personalize. Fields can be empty—Cai will still greet you and invite you in.
+              Pick a <strong>preset persona</strong> to fill the fields, or choose <strong>Custom</strong> and paste or type
+              mock <strong>pet parent</strong>, <strong>pet</strong>, and <strong>shopping / browsing</strong> signals. In a
+              full app this would come from accounts and telemetry; here you supply it so the welcome can personalize.
+              Fields can be empty—Cai will still greet you and invite you in.
             </p>
+
+            <div className="field-block persona-picker" role="radiogroup" aria-labelledby="persona-picker-label">
+              <p className="label" id="persona-picker-label">
+                Session preset
+              </p>
+              <p className="label-hint" id="persona-picker-hint">
+                Selecting a persona replaces the three text areas below. Editing any field switches you to Custom.
+              </p>
+              <div className="persona-options" aria-describedby="persona-picker-hint">
+                {SESSION_PERSONAS.map((p) => (
+                  <label key={p.id} className="persona-option">
+                    <input
+                      type="radio"
+                      name="sessionPersona"
+                      value={p.id}
+                      checked={sessionPersonaId === p.id}
+                      onChange={() => applySessionPersona(p.id)}
+                    />
+                    <span>{p.title}</span>
+                  </label>
+                ))}
+                <label className="persona-option">
+                  <input
+                    type="radio"
+                    name="sessionPersona"
+                    value={SESSION_PERSONA_CUSTOM}
+                    checked={sessionPersonaId === SESSION_PERSONA_CUSTOM}
+                    onChange={() => applySessionPersona(SESSION_PERSONA_CUSTOM)}
+                  />
+                  <span>Custom (type your own)</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="gather-session-divider" aria-hidden="true">
+              <div className="gather-session-divider__line" />
+            </div>
 
             <div className="field-block session-first-time-block">
               <div className="session-first-time-row">
@@ -252,7 +325,10 @@ export default function App() {
                   rows={4}
                   placeholder="Example: Jamie, prefers grain-inclusive diets, two cats and one dog in the home."
                   value={parentProfile}
-                  onChange={(e) => setParentProfile(e.target.value)}
+                  onChange={(e) => {
+                    setSessionPersonaId(SESSION_PERSONA_CUSTOM);
+                    setParentProfile(e.target.value);
+                  }}
                 />
               </div>
 
@@ -267,7 +343,10 @@ export default function App() {
                   rows={4}
                   placeholder="Example: Luna — 4-year-old domestic shorthair, indoor, picky with wet food."
                   value={petProfile}
-                  onChange={(e) => setPetProfile(e.target.value)}
+                  onChange={(e) => {
+                    setSessionPersonaId(SESSION_PERSONA_CUSTOM);
+                    setPetProfile(e.target.value);
+                  }}
                 />
               </div>
 
@@ -275,14 +354,26 @@ export default function App() {
                 <label className="label" htmlFor="shop">
                   Shopping &amp; browsing history
                 </label>
-                <p className="label-hint">Recent orders, saved items, categories browsed, brands clicked—whatever you want to simulate.</p>
+                <p className="label-hint" id="shop-hint">
+                  Free-text: recent orders, saved items, categories browsed, brands clicked. For <strong>order help</strong> in
+                  chat, add an optional <strong>{`### Structured order history (prototype)`}</strong> block (JSON array with{" "}
+                  <code>orderNumber</code>, <code>summary</code>, <code>placedAt</code>, <code>status</code>, and optional{" "}
+                  <code>imageUrl</code> per row) at the end of this field, or a JSON array as the only content. The order
+                  card shows a status pill and &quot;Delivered on …&quot; / &quot;Arrives by …&quot; from <code>placedAt</code>,
+                  not Autoship/one-time <code>meta</code> lines. Cai only uses rows you supply. The structured block is
+                  stripped from the model bundle below so the reply does not repeat the same data twice.
+                </p>
                 <textarea
                   id="shop"
                   className="textarea"
                   rows={4}
                   placeholder="Example: Recently viewed freeze-dried toppers; last order included litter and dental treats."
                   value={shoppingHistory}
-                  onChange={(e) => setShoppingHistory(e.target.value)}
+                  onChange={(e) => {
+                    setSessionPersonaId(SESSION_PERSONA_CUSTOM);
+                    setShoppingHistory(e.target.value);
+                  }}
+                  aria-describedby="shop-hint"
                 />
               </div>
             </div>
@@ -379,16 +470,49 @@ export default function App() {
                 <>
                   <div className="thread">
                     {messages.map((m, i) => {
-                      const { body, chips, products, recommendationRationale } =
+                      const {
+                        body,
+                        bodyAfterVet,
+                        chips,
+                        products,
+                        orders,
+                        recommendationRationale,
+                        vetIngress,
+                        vetWaitSeconds,
+                        vetCardIntro,
+                      } =
                         m.role === "assistant"
                           ? parseAssistantMessage(m.content)
-                          : { body: m.content, chips: [], products: null, recommendationRationale: undefined };
+                          : {
+                              body: m.content,
+                              bodyAfterVet: undefined,
+                              chips: [],
+                              products: null,
+                              orders: null,
+                              recommendationRationale: undefined,
+                              vetIngress: false,
+                              vetWaitSeconds: undefined,
+                              vetCardIntro: undefined,
+                            };
                       const sectionTitle = products?.heading?.trim() || "Recommendation";
+                      const ordersSectionTitle = orders?.heading?.trim() || "Your recent orders";
                       return (
                         <div key={i} className={`bubble-row ${m.role}`}>
                           <div className="bubble">
                             <div className="bubble-meta">{m.role === "user" ? "You" : "Cai"}</div>
                             {body.trim() ? <div className="bubble-body">{body}</div> : null}
+                            {m.role === "assistant" && vetIngress ? (
+                              <ConnectWithVetIngressCard waitSeconds={vetWaitSeconds} intro={vetCardIntro} />
+                            ) : null}
+                            {m.role === "assistant" && bodyAfterVet?.trim() ? (
+                              <div className="bubble-body cai-msg-ai-body-after-vet">{bodyAfterVet}</div>
+                            ) : null}
+                            {m.role === "assistant" && orders ? (
+                              <section className="cai-recommendation-section" aria-label="Recent orders">
+                                <h3 className="cai-recommendation-section__title">{ordersSectionTitle}</h3>
+                                <CaiOrderShowcase block={orders} />
+                              </section>
+                            ) : null}
                             {m.role === "assistant" && products ? (
                               <section className="cai-recommendation-section" aria-label="Product recommendation">
                                 <h3 className="cai-recommendation-section__title">{sectionTitle}</h3>
