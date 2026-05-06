@@ -9,7 +9,7 @@ import { useEffect, useState } from "react";
 import caiLogoSvg from "./assets/cai-header/cai-logo.svg";
 import cartSvg from "./assets/cai-header/cart.svg";
 import notchSvg from "./assets/cai-header/notch.svg";
-import moreSvg from "./assets/cai-header/more.svg";
+import historySvg from "./assets/cai-header/history.svg";
 import statusRightSvg from "./assets/cai-header/status-right.svg";
 import tosSheetBackSvg from "./assets/cai-header/tos-sheet-back.svg";
 import "./cai-top-of-sheet.css";
@@ -89,9 +89,9 @@ export function CaiTopOfSheet({ className }: Props) {
         </div>
 
         <div className="cai-tos__side cai-tos__side--right" data-name="Right actions">
-          <button type="button" className="cai-tos__icon-btn" aria-label="More options">
-            <span className="cai-tos__icon-wrap">
-              <img src={moreSvg} alt="" width={20} height={20} decoding="async" />
+          <button type="button" className="cai-tos__icon-btn" aria-label="Chat history">
+            <span className="cai-tos__icon-wrap cai-tos__icon-wrap--history">
+              <img src={historySvg} alt="" width={24} height={24} decoding="async" />
             </span>
           </button>
           <button type="button" className="cai-tos__icon-btn" aria-label="Cart">

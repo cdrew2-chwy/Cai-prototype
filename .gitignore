@@ -3,3 +3,5 @@ dist
 .env
 .DS_Store
 .cursor
+# Large local export (optional); keep out of git or use Git LFS
+data/product-catalog.csv

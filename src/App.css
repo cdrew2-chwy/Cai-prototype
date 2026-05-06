@@ -39,6 +39,126 @@
   margin: 0 auto;
 }
 
+.workbench-split--session-collapsed {
+  grid-template-columns: 1fr;
+  justify-items: center;
+}
+
+.workbench-split--session-collapsed .workbench-column--session {
+  display: none;
+}
+
+.workbench-split--session-collapsed .phone-column {
+  grid-column: 1;
+}
+
+.device-workbench-top {
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Welcome + phone preview: actions only above centered device (matches chat “solo phone” layout). */
+.device-workbench-welcome-toolbar {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.device-workbench-welcome-toolbar .chat-prototype-buttons {
+  margin-top: 0.35rem;
+}
+
+.device-workbench-welcome-toolbar .banner.error {
+  margin-top: 0.5rem;
+}
+
+/*
+ * Figma 3619:4232 — Chat prototype buttons (exported SVG: 424×56, 8px frame padding, 8px gap)
+ * https://www.figma.com/design/A3nyvH8N2Gx62Wfxs9opoS/CAI---Phase-3---Evolution?node-id=3619-4232
+ * Each control: 200×40, corner radius 10 (not pill); secondary white + #1C49C2 stroke/text; primary #005AFE + radial veils.
+ * Reference SVG: `src/assets/chat-prototype-buttons.svg` (Figma export 3619:4232).
+ */
+.chat-prototype-buttons {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px;
+}
+
+.chat-prototype-buttons__btn {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  width: min(200px, calc((100% - 8px) / 2));
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--typography-text-typeface);
+  font-size: var(--typography-fs-utility-3);
+  line-height: var(--typography-lh-utility-3);
+  font-weight: var(--typography-fw-utility-stronger);
+  letter-spacing: var(--typography-ls-standard);
+  cursor: pointer;
+  text-align: center;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    filter 0.15s ease;
+}
+
+.chat-prototype-buttons__btn--secondary {
+  background: #fff;
+  color: #1c49c2;
+  border-color: #1c49c2;
+}
+
+.chat-prototype-buttons__btn--secondary:hover:not(:disabled) {
+  background: rgb(28 73 194 / 0.06);
+}
+
+.chat-prototype-buttons__btn--primary {
+  color: #fff;
+  border-color: #005afe;
+  background-color: #005afe;
+  background-image:
+    radial-gradient(100% 100% at 0% 0%, rgb(28 72 194 / 0) 0%, rgb(28 73 194 / 0.75) 100%),
+    radial-gradient(100% 100% at 100% 100%, rgb(28 73 194 / 0.75) 0%, rgb(28 72 194 / 0) 100%);
+}
+
+.chat-prototype-buttons__btn--primary:hover:not(:disabled) {
+  filter: brightness(0.94);
+}
+
+.chat-prototype-buttons__btn:focus-visible {
+  outline: 2px solid #1c49c2;
+  outline-offset: 2px;
+}
+
+.chat-prototype-buttons__btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.session-context-toggle-wrap {
+  margin-top: 0.35rem;
+}
+
+.device-workbench-inline-error {
+  margin-top: 0.75rem;
+}
+
 .workbench-column {
   min-width: 0;
 }
@@ -254,7 +374,11 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem 1rem;
-  padding: 0.75rem 0.85rem;
+  height: fit-content;
+  padding-top: 0;
+  padding-right: 0.85rem;
+  padding-bottom: 0.75rem;
+  padding-left: 0.85rem;
   border: 1px solid #e3e8ee;
   border-radius: 10px;
   background: #fafbfc;
@@ -263,6 +387,7 @@
 .session-first-time-text {
   flex: 1 1 14rem;
   min-width: 0;
+  height: fit-content;
 }
 
 .session-first-time-text .label {
@@ -339,6 +464,97 @@
   margin: 0 0 0.35rem;
   font-size: 0.82rem;
   color: #64748b;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.order-history-hint {
+  margin: 0 0 0.35rem;
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
+.order-history-hint__lead {
+  display: inline;
+  margin: 0;
+  font-size: inherit;
+  color: inherit;
+}
+
+.order-history-hint__details {
+  display: inline;
+  margin: 0;
+  vertical-align: middle;
+  margin-left: 0.25rem;
+}
+
+.order-history-hint__summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.2rem;
+  height: 1.2rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  cursor: pointer;
+  border-radius: 50%;
+  border: 1px solid #cbd5e1;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 0.62rem;
+  font-weight: 700;
+  font-style: italic;
+  line-height: 1;
+  user-select: none;
+}
+
+.order-history-hint__summary::-webkit-details-marker {
+  display: none;
+}
+
+.order-history-hint__summary::marker {
+  content: "";
+}
+
+.order-history-hint__summary:hover {
+  border-color: #94a3b8;
+  background: #e2e8f0;
+}
+
+.order-history-hint__summary:focus-visible {
+  outline: 2px solid rgba(28, 73, 194, 0.55);
+  outline-offset: 2px;
+}
+
+.order-history-hint__panel {
+  margin-top: 0.45rem;
+  padding: 0.55rem 0.7rem;
+  max-width: 100%;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.07);
+  line-height: 1.45;
+}
+
+.order-history-hint__panel p {
+  margin: 0;
+}
+
+.order-history-hint__panel code {
+  font-size: 0.92em;
+  word-break: break-all;
 }
 
 .optional {
@@ -434,9 +650,22 @@
 
 .welcome-chips {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
   margin-top: 0.65rem;
+}
+
+/* Figma 3065:29722 — same surface as phone welcome chips; non-interactive workbench preview */
+.cai-welcome-chip--static {
+  cursor: default;
+  pointer-events: none;
+  user-select: none;
+}
+
+.cai-welcome-chip--static.cai-prompt-chip--rich > span:last-child {
+  white-space: normal;
+  text-align: left;
 }
 
 .chip-static {
@@ -475,7 +704,7 @@
   width: 2.5rem;
   height: 2.5rem;
   border-radius: 0.75rem;
-  background: rgba(28, 73, 194, 1);
+  background-color: rgba(28, 73, 194, 1);
   color: #fff;
   display: grid;
   place-items: center;
@@ -604,30 +833,132 @@
 
 .thread .cai-vet-ingress {
   width: 100%;
-  max-width: 358px;
+  max-width: 342px;
   margin-top: 0.65rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
 }
 
 .thread .cai-vet-ingress__intro {
-  margin: 0 0 0.5rem;
+  align-self: stretch;
+  margin: 0 0 0.15rem;
   color: #475569;
   white-space: pre-wrap;
 }
 
 .thread .cai-vet-ingress__card {
-  display: block;
+  position: relative;
+  display: flex;
+  flex-direction: row;
   width: 100%;
-  height: auto;
+  max-width: 342px;
+  min-height: 160px;
   border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow:
+    0 0 2px rgb(0 0 0 / 0.04),
+    0 4px 8px rgb(0 0 0 / 0.08);
+}
+
+.thread .cai-vet-ingress__free {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  padding: 4px 12px;
+  border-radius: 10px 0 10px 0;
+  background: #1c49c2;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  color: #fff;
+}
+
+.thread .cai-vet-ingress__visual {
+  flex: 1 1 0;
+  min-width: 0;
+  position: relative;
+  overflow: hidden;
+  background: #e8f0fc;
+}
+
+.thread .cai-vet-ingress__hero {
+  position: absolute;
+  inset: 0;
+  width: 106%;
+  height: 114%;
+  left: -1.3%;
+  top: -3.5%;
+  max-width: none;
+  object-fit: cover;
+  object-position: 50% 35%;
+}
+
+.thread .cai-vet-ingress__body {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px;
+  background: #fff;
+}
+
+.thread .cai-vet-ingress__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.thread .cai-vet-ingress__title {
+  margin: 0;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+  color: #121212;
+}
+
+.thread .cai-vet-ingress__desc {
+  margin: 0;
+  font-size: 11px;
+  line-height: 15px;
+  font-weight: 400;
+  color: #4d4d4d;
+}
+
+.thread .cai-vet-ingress__tag {
+  margin: 0;
+  display: inline-flex;
+  padding: 4px 8px;
+  border-radius: 56px;
+  border: 1px solid #eee;
+  background: #ebfbf4;
+  font-size: 10px;
+  line-height: 14px;
+  font-weight: 500;
+  color: #121212;
 }
 
 .thread .cai-vet-ingress__wait {
-  margin: 0.45rem 0 0;
-  font-size: 0.82rem;
-  line-height: 1.35;
-  font-weight: 500;
-  color: #64748b;
+  margin: 0;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 400;
+  color: #002957;
   text-align: center;
+  white-space: normal;
+}
+
+.thread .cai-vet-ingress__wait-value {
+  font-weight: 500;
+  color: #4657c7;
+  line-height: 21px;
 }
 
 .inline-chips {
@@ -646,7 +977,11 @@
   background: #fff;
   border-radius: 999px;
   padding: 0.35rem 0.65rem;
-  font-size: 0.85rem;
+  font-family: var(--typography-text-typeface);
+  font-size: var(--typography-fs-product-text-1);
+  line-height: var(--typography-lh-product-text-1);
+  font-weight: var(--typography-fw-product-text-strong);
+  letter-spacing: var(--typography-ls-standard);
   cursor: pointer;
 }
 
@@ -692,7 +1027,7 @@
   border-radius: 10px;
   padding: 0.65rem 1rem;
   font-weight: 600;
-  background: #0f766e;
+  background-color: rgba(28, 73, 194, 1);
   color: #fff;
   cursor: pointer;
 }
@@ -703,7 +1038,7 @@
 }
 
 .send:not(:disabled):hover {
-  background: #0d9488;
+  background-color: rgba(22, 58, 160, 1);
 }
 
 /* Gather: structured order rows (up to 5) */
@@ -769,17 +1104,25 @@
   flex: none;
 }
 
-.gather-order-status-delivery {
+.gather-order-dates-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 0.65rem 0.85rem;
-  align-items: end;
+  align-items: start;
+}
+
+.gather-order-dates-row--single {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 @media (max-width: 520px) {
-  .gather-order-status-delivery {
+  .gather-order-dates-row {
     grid-template-columns: 1fr;
   }
+}
+
+.gather-order-status-delivery {
+  display: block;
 }
 
 .input--select {

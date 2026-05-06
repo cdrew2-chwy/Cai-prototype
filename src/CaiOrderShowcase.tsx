@@ -1,8 +1,13 @@
 import { useState } from "react";
 import type { CaiOrderItem, CaiOrdersBlock } from "./chatUtils";
+import { useOrderCardThumbImg } from "./useChewyProductImageSrc";
 import "./cai-order-cards.css";
 
-type Props = { block: CaiOrdersBlock };
+type Props = {
+  block: CaiOrdersBlock;
+  /** When set, each order row is tappable (order-help flow before intent chips). */
+  onSelectOrder?: (order: CaiOrderItem) => void;
+};
 
 /**
  * Figma: order card — 3285:29258 (thumb + Order # + status + date; no product title on card).
@@ -15,7 +20,7 @@ function stripLeadingPFromOrderId(segment: string): string {
 }
 
 /** "Order # 1234566789" style per Figma (one space after #, bold title line). */
-function formatOrderNumberLabel(raw: string): string {
+export function formatOrderNumberLabel(raw: string): string {
   const t = raw.trim();
   if (/^order\s*#/i.test(t)) {
     const m = t.match(/^order\s*#\s*(.*)$/i);
@@ -43,6 +48,31 @@ function formatFigmaOrderDate(iso: string): string {
   const m = MONTH3[d.getMonth()] ?? "—";
   const day = d.getDate();
   return `${w}, ${m} ${day}`;
+}
+
+/** Figma 3288:29321 — “Placed Mon, Apr 27” from `placedAt` ISO. */
+function formatPlacedOnCaption(iso: string | undefined): string {
+  if (!iso?.trim()) return "";
+  const d = formatFigmaOrderDate(iso);
+  return d ? `Placed ${d}` : "";
+}
+
+function formatOrderDigitsForSelected(raw: string): string {
+  const t = raw.trim();
+  if (/^order\s*#/i.test(t)) {
+    const m = t.match(/^order\s*#\s*(.*)$/i);
+    return stripLeadingPFromOrderId(m?.[1]?.trim() ?? "");
+  }
+  if (t.startsWith("#")) {
+    return stripLeadingPFromOrderId(t.replace(/^#+\s*/, "").trim());
+  }
+  return stripLeadingPFromOrderId(t);
+}
+
+/** Figma 3288:29321 — “Order #169190358 selected” (no space after #). */
+export function formatOrderSelectedCaption(o: CaiOrderItem): string {
+  const n = formatOrderDigitsForSelected(o.orderNumber);
+  return n ? `Order #${n} selected` : "Order selected";
 }
 
 type StatusKind = "delivered" | "in_transit" | "closed" | "other";
@@ -77,10 +107,12 @@ function getStatusKind(o: CaiOrderItem): StatusKind {
  * Does not render `summary` (product/line list) or `meta` on the card.
  */
 function getStatusDateCaption(o: CaiOrderItem): string {
-  if (!o.placedAt?.trim()) return "";
-  const d = formatFigmaOrderDate(o.placedAt);
-  if (!d) return "";
   const kind = getStatusKind(o);
+  const dateIso =
+    kind === "delivered" ? (o.deliveredAt?.trim() || o.placedAt) : o.placedAt;
+  if (!dateIso?.trim()) return "";
+  const d = formatFigmaOrderDate(dateIso);
+  if (!d) return "";
   if (kind === "delivered") return `Arrived ${d}`;
   if (kind === "in_transit") return `Arrives by ${d}`;
   if (kind === "closed") return `Canceled on ${d}`;
@@ -131,6 +163,40 @@ function DeliveredPillCheckIcon() {
   );
 }
 
+function OrderCardThumb({
+  order,
+  width,
+  height,
+  className,
+}: {
+  order: CaiOrderItem;
+  width: number;
+  height: number;
+  className: string;
+}) {
+  const { src, referrerPolicy, onError, failed } = useOrderCardThumbImg(order);
+  if (failed || !src) {
+    return (
+      <div className="cai-order-card__thumb-fallback" aria-hidden>
+        <OrderTileIcon />
+      </div>
+    );
+  }
+  return (
+    <img
+      className={className}
+      src={src}
+      referrerPolicy={referrerPolicy}
+      onError={onError}
+      alt=""
+      width={width}
+      height={height}
+      loading="lazy"
+      decoding="async"
+    />
+  );
+}
+
 function OrderTileIcon() {
   return (
     <svg
@@ -171,34 +237,83 @@ function OrderTileIcon() {
   );
 }
 
-function OrderCardRow({ o }: { o: CaiOrderItem }) {
+function formatCatalogListPrice(n: number): string {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
+}
+
+function OrderCardRow({ o, onSelect }: { o: CaiOrderItem; onSelect?: (order: CaiOrderItem) => void }) {
   const kind = getStatusKind(o);
   const dateCaption = getStatusDateCaption(o);
   const hasStatusPill = Boolean(o.status?.trim());
   const pillText = hasStatusPill ? normalizePillStatus(o.status) : "";
 
+  const inner = (
+    <div className="cai-order-card__inner">
+      <div className="cai-order-card__thumb">
+        <OrderCardThumb order={o} width={56} height={56} className="cai-order-card__thumb-img" />
+      </div>
+      <div className="cai-order-card__content">
+        <p className="cai-order-card__title">{formatOrderNumberLabel(o.orderNumber)}</p>
+        {dateCaption || hasStatusPill ? (
+          <div className="cai-order-card__status-line">
+            {hasStatusPill ? (
+              <span className={orderStatusPillClassKind(o)}>
+                {kind === "delivered" ? <DeliveredPillCheckIcon /> : null}
+                {pillText}
+              </span>
+            ) : null}
+            {dateCaption ? <span className="cai-order-card__date-line">{dateCaption}</span> : null}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+
+  if (onSelect) {
+    return (
+      <li className="cai-order-card cai-order-card--selectable" data-order-id={o.id}>
+        <button
+          type="button"
+          className="cai-order-card__hit"
+          aria-label={`Select ${formatOrderNumberLabel(o.orderNumber)} for help`}
+          onClick={() => onSelect(o)}
+        >
+          {inner}
+        </button>
+      </li>
+    );
+  }
+
   return (
     <li className="cai-order-card" data-order-id={o.id}>
-      <div className="cai-order-card__inner">
-        <div className="cai-order-card__thumb">
-          {o.imageUrl ? (
-            <img
-              className="cai-order-card__thumb-img"
-              src={o.imageUrl}
-              alt=""
-              width={56}
-              height={56}
-              loading="lazy"
-              decoding="async"
-            />
-          ) : (
-            <div className="cai-order-card__thumb-fallback" aria-hidden>
-              <OrderTileIcon />
-            </div>
-          )}
+      {inner}
+    </li>
+  );
+}
+
+/**
+ * Figma 3288:29321 — selected order widget: thumb, order #, placed date, status + shipment line, product name.
+ * https://www.figma.com/design/A3nyvH8N2Gx62Wfxs9opoS/CAI---Phase-3---Evolution?node-id=3288-29321
+ */
+export function CaiOrderSelectedDetailCard({ o }: { o: CaiOrderItem }) {
+  const kind = getStatusKind(o);
+  const dateCaption = getStatusDateCaption(o);
+  const hasStatusPill = Boolean(o.status?.trim());
+  const pillText = hasStatusPill ? normalizePillStatus(o.status) : "";
+  const placedLine = formatPlacedOnCaption(o.placedAt);
+  const productLine = (o.summary ?? "").trim();
+
+  return (
+    <div className="cai-order-card cai-order-card--detailed" data-order-id={o.id}>
+      <div className="cai-order-card__inner cai-order-card__inner--detailed">
+        <div className="cai-order-card__thumb cai-order-card__thumb--detailed">
+          <OrderCardThumb order={o} width={50} height={50} className="cai-order-card__thumb-img" />
         </div>
-        <div className="cai-order-card__content">
-          <p className="cai-order-card__title">{formatOrderNumberLabel(o.orderNumber)}</p>
+        <div className="cai-order-card__content cai-order-card__content--detailed">
+          <p className="cai-order-card__title cai-order-card__title--detailed">{formatOrderNumberLabel(o.orderNumber)}</p>
+          {placedLine ? (
+            <p className="cai-order-card__placed-line">{placedLine}</p>
+          ) : null}
           {dateCaption || hasStatusPill ? (
             <div className="cai-order-card__status-line">
               {hasStatusPill ? (
@@ -210,16 +325,63 @@ function OrderCardRow({ o }: { o: CaiOrderItem }) {
               {dateCaption ? <span className="cai-order-card__date-line">{dateCaption}</span> : null}
             </div>
           ) : null}
+          {productLine ? (
+            <p className="cai-order-card__product-line" title={productLine}>
+              {productLine}
+            </p>
+          ) : null}
+          {o.listPrice != null && Number.isFinite(o.listPrice) ? (
+            <p className="cai-order-card__list-price" aria-label="List price">
+              {formatCatalogListPrice(o.listPrice)} list
+            </p>
+          ) : null}
         </div>
       </div>
-    </li>
+    </div>
+  );
+}
+
+/**
+ * Return / exchange product row — Figma 3551:49473 (50×50 thumb, Order # + status + date; no product title).
+ */
+export function OrderReturnExchangeSummary({ o }: { o: CaiOrderItem }) {
+  const kind = getStatusKind(o);
+  const dateCaption = getStatusDateCaption(o);
+  const hasStatusPill = Boolean(o.status?.trim());
+  const pillText = hasStatusPill ? normalizePillStatus(o.status) : "";
+  const orderFull = formatOrderNumberLabel(o.orderNumber);
+  const orderDigits = orderFull.match(/^Order #\s+(.+)$/)?.[1]?.trim() ?? orderFull.replace(/^Order #\s*/i, "");
+
+  return (
+    <div className="cai-return-exchange__summary">
+      <div className="cai-return-exchange__thumb">
+        <OrderCardThumb order={o} width={50} height={50} className="cai-return-exchange__thumb-img" />
+      </div>
+      <div className="cai-return-exchange__summary-copy">
+        <p className="cai-return-exchange__order-line">
+          <span className="cai-return-exchange__order-prefix">Order #</span>{" "}
+          <span className="cai-return-exchange__order-digits">{orderDigits}</span>
+        </p>
+        {dateCaption || hasStatusPill ? (
+          <div className="cai-order-card__status-line cai-return-exchange__status-line">
+            {hasStatusPill ? (
+              <span className={orderStatusPillClassKind(o)}>
+                {kind === "delivered" ? <DeliveredPillCheckIcon /> : null}
+                {pillText}
+              </span>
+            ) : null}
+            {dateCaption ? <span className="cai-order-card__date-line">{dateCaption}</span> : null}
+          </div>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
 /**
  * Renders ```cai-orders``` as tappable list rows; collapses to 3 when `showLoadMore` until expanded.
  */
-export function CaiOrderShowcase({ block }: Props) {
+export function CaiOrderShowcase({ block, onSelectOrder }: Props) {
   const [expanded, setExpanded] = useState(false);
   const { orders, showLoadMore } = block;
   const limit = showLoadMore && !expanded ? 3 : orders.length;
@@ -230,7 +392,7 @@ export function CaiOrderShowcase({ block }: Props) {
     <div className="cai-order-showcase">
       <ul className="cai-order-card-list" aria-label="Order list">
         {visible.map((o) => (
-          <OrderCardRow key={o.id} o={o} />
+          <OrderCardRow key={o.id} o={o} onSelect={onSelectOrder} />
         ))}
       </ul>
       {canLoadMore ? (

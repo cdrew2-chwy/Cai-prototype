@@ -1,7 +1,18 @@
-import { FormEvent, ReactNode, useId } from "react";
+import { FormEvent, ReactNode, useCallback, useEffect, useId, useRef, useState } from "react";
 import { CaiTopOfSheet } from "./CaiTopOfSheet";
 import chatIngressSvg from "./assets/cai-phone/chat-ingress.svg";
+import moreContentBtnSvg from "./assets/cai-phone/cai-more-content-button.svg";
 import "./cai-phone.css";
+
+const SCROLL_END_THRESHOLD_PX = 8;
+
+function scrollElHasOverflowBelow(el: HTMLDivElement) {
+  return el.scrollHeight > el.clientHeight + SCROLL_END_THRESHOLD_PX;
+}
+
+function scrollElIsAtBottom(el: HTMLDivElement) {
+  return el.scrollHeight - el.scrollTop - el.clientHeight <= SCROLL_END_THRESHOLD_PX;
+}
 
 /*
  * Production (Chewy app): this shell sits inside the native client. Product cards and CTAs here
@@ -58,6 +69,52 @@ function ChatIngressIcon() {
 export function CaiPhoneScreen({ phase, children, chatInput, onChatInputChange, onSend, chatLoading }: Props) {
   const inputId = useId();
   const composerEnabled = phase === "chat";
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const contentMeasureRef = useRef<HTMLDivElement>(null);
+  const [showMoreContent, setShowMoreContent] = useState(false);
+
+  const updateMoreContentVisibility = useCallback(() => {
+    const sc = scrollRef.current;
+    if (!sc) return;
+    const hasMore = scrollElHasOverflowBelow(sc) && !scrollElIsAtBottom(sc);
+    setShowMoreContent(hasMore);
+  }, []);
+
+  useEffect(() => {
+    const sc = scrollRef.current;
+    const inner = contentMeasureRef.current;
+    if (!sc) return;
+
+    updateMoreContentVisibility();
+
+    sc.addEventListener("scroll", updateMoreContentVisibility, { passive: true });
+    const onResize = () => updateMoreContentVisibility();
+    window.addEventListener("resize", onResize);
+
+    const ro =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => {
+            updateMoreContentVisibility();
+          })
+        : null;
+    if (inner) ro?.observe(inner);
+
+    const raf = requestAnimationFrame(() => updateMoreContentVisibility());
+
+    return () => {
+      cancelAnimationFrame(raf);
+      sc.removeEventListener("scroll", updateMoreContentVisibility);
+      window.removeEventListener("resize", onResize);
+      ro?.disconnect();
+    };
+  }, [updateMoreContentVisibility, phase]);
+
+  function onMoreContentClick() {
+    const sc = scrollRef.current;
+    if (!sc) return;
+    const top = sc.scrollHeight - sc.clientHeight;
+    sc.scrollTo({ top, behavior: "smooth" });
+  }
 
   function onFooterSubmit(e: FormEvent) {
     e.preventDefault();
@@ -69,7 +126,24 @@ export function CaiPhoneScreen({ phase, children, chatInput, onChatInputChange, 
       {/* Figma: AI chat frame (3145:47987) — gradient + scroll + pinned chat bar */}
       <div className="cai-chat-frame" data-node-id="3145:47987" data-name="AI chat frame">
         <div className="cai-chat-frame-bg" aria-hidden />
-        <div className="cai-scroll">{children}</div>
+        <div className="cai-scroll" ref={scrollRef}>
+          <div className="cai-scroll__content" ref={contentMeasureRef}>
+            {children}
+          </div>
+        </div>
+
+        {showMoreContent ? (
+          <button
+            type="button"
+            className="cai-more-content-btn"
+            data-node-id="3593:50070"
+            data-name="More content button"
+            aria-label="More content below. Scroll to bottom."
+            onClick={onMoreContentClick}
+          >
+            <img src={moreContentBtnSvg} alt="" width={42} height={42} decoding="async" />
+          </button>
+        ) : null}
 
         <footer className="cai-chat-bar" data-node-id="3145:47989" data-name="Chat chat bar">
           <div

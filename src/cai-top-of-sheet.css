@@ -172,6 +172,11 @@
   height: 24px;
 }
 
+.cai-tos__icon-wrap--history {
+  width: 24px;
+  height: 24px;
+}
+
 .cai-tos__icon-wrap img {
   display: block;
   width: 100%;

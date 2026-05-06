@@ -1,0 +1,17 @@
+{
+  "codeConnect": {
+    "parser": "react",
+    "label": "React",
+    "language": "tsx",
+    "include": [
+      "src/**/*.figma.tsx",
+      "src/CaiOrderShowcase.tsx",
+      "src/CaiOrderPickFollowup.tsx",
+      "src/CaiPhoneScreen.tsx",
+      "src/CaiTopOfSheet.tsx",
+      "src/chatUtils.ts"
+    ],
+    "exclude": ["node_modules/**", "dist/**"],
+    "interactiveSetupFigmaFileUrl": "https://www.figma.com/design/A3nyvH8N2Gx62Wfxs9opoS/CAI---Phase-3---Evolution"
+  }
+}

@@ -12,8 +12,9 @@ const SUNNY_ORDER_HELP_ROWS: PrototypeOrderRow[] = [
     summary: "https://www.chewy.com/iams-proactive-health-healthy-aging/dp/46729",
     status: "Delivered",
     placedAt: "2026-04-27T12:00:00.000Z",
+    deliveredAt: "2026-04-30T12:00:00.000Z",
     autoship: true,
-    meta: "On Autoship — Expected delivery: Wed, Apr 29",
+    meta: "On Autoship",
   },
   {
     id: "o2",
@@ -21,8 +22,9 @@ const SUNNY_ORDER_HELP_ROWS: PrototypeOrderRow[] = [
     summary: "https://www.chewy.com/greenies-aging-care-large-dental-dog/dp/183796",
     status: "Delivered",
     placedAt: "2026-04-14T12:00:00.000Z",
+    deliveredAt: "2026-04-17T12:00:00.000Z",
     autoship: true,
-    meta: "On Autoship — Expected delivery: Fri, Apr 17",
+    meta: "On Autoship",
   },
   {
     id: "o3",
@@ -30,49 +32,59 @@ const SUNNY_ORDER_HELP_ROWS: PrototypeOrderRow[] = [
     summary: "https://www.chewy.com/playology-all-natural-pork-sausage/dp/348131",
     status: "Delivered",
     placedAt: "2026-03-22T12:00:00.000Z",
+    deliveredAt: "2026-03-25T12:00:00.000Z",
     autoship: false,
-    meta: "Expected delivery: Tue, Mar 24",
   },
 ];
 
 const BUG_ORDER_HELP_ROWS: PrototypeOrderRow[] = [
   {
     id: "b1",
-    orderNumber: "#9271503846",
-    summary: "Purina ONE Whole Body Support Chicken Dry Cat Food, 22-lb bag",
+    orderNumber: "#8473920156",
+    summary: "https://www.chewy.com/purina-one-whole-body-support-chicken/dp/3730174",
     status: "Delivered",
-    placedAt: "2026-02-01T12:00:00.000Z",
+    placedAt: "2026-04-27T12:00:00.000Z",
+    deliveredAt: "2026-04-29T12:00:00.000Z",
     autoship: true,
+    meta: "On Autoship",
   },
   {
     id: "b2",
-    orderNumber: "#3649281750",
-    summary: "Tidy Cats Free & Clean Unscented Clumping Clay Cat Litter, 14-lb jug",
-    status: "Processing",
-    placedAt: "2026-04-10T10:00:00.000Z",
+    orderNumber: "#9284710365",
+    summary: "https://www.chewy.com/tidy-cats-free-clean-unscented/dp/168308",
+    status: "Delivered",
+    placedAt: "2026-04-27T14:00:00.000Z",
+    deliveredAt: "2026-04-29T12:00:00.000Z",
     autoship: true,
+    meta: "On Autoship",
   },
   {
     id: "b3",
-    orderNumber: "#8150394762",
-    summary: "NexGard COMBO Topical for Cats, 5.6-16.5 lbs. (Yellow Box), 6 Doses (6-mos. supply)",
+    orderNumber: "#5568291730",
+    summary: "https://www.chewy.com/nexgard-combo-topical-cats-56-165-lbs/dp/851790",
     status: "Delivered",
-    placedAt: "2025-12-20T10:00:00.000Z",
+    placedAt: "2026-02-12T12:00:00.000Z",
+    deliveredAt: "2026-02-18T12:00:00.000Z",
     autoship: true,
+    meta: "On Autoship",
   },
   {
     id: "b4",
-    orderNumber: "#6492730158",
-    summary: "Meow Mix Irresistibles White Meat Chicken Soft & Chewy Cat Treats, 12-oz bag",
+    orderNumber: "#6928475103",
+    summary: "https://www.chewy.com/meow-mix-irresistibles-white-meat/dp/986838",
     status: "Delivered",
-    placedAt: "2026-04-08T10:00:00.000Z",
+    placedAt: "2026-03-22T12:00:00.000Z",
+    deliveredAt: "2026-03-24T12:00:00.000Z",
+    autoship: false,
   },
   {
     id: "b5",
-    orderNumber: "#5038264971",
-    summary: "Potaroma Crinkle Fish Cat Toys with Catnip, Multi-Color, 7.8-in, 3 count",
+    orderNumber: "#3819264750",
+    summary: "https://www.chewy.com/potaroma-crinkle-fish-cat-toys-catnip/dp/2277670",
     status: "Delivered",
-    placedAt: "2026-04-08T10:00:00.000Z",
+    placedAt: "2026-03-18T12:00:00.000Z",
+    deliveredAt: "2026-03-20T12:00:00.000Z",
+    autoship: false,
   },
 ];
 
@@ -106,9 +118,7 @@ Health Conditions: Diabetes
 Allergies: Dust mites
 Medications: None`,
     orderHistory: formatStructuredOrderHistoryAppend(SUNNY_ORDER_HELP_ROWS).replace(/^\n+/, ""),
-    browsingHistory: `Recent browsing (simulated):
-
-Orthopedic dog bed, senior dog supplements`,
+    browsingHistory: `Orthopedic dog bed, senior dog supplements`,
   },
   {
     id: "bug-himalayan-cat",
@@ -125,11 +135,10 @@ Age: 6 years
 Weight: 10 lbs
 Health conditions: none
 Allergies: none
-Prescriptions: NexGuard`,
+Prescriptions: NexGuard
+Veterinary clinic: Pacific Coast Veterinary Specialists`,
     orderHistory: formatStructuredOrderHistoryAppend(BUG_ORDER_HELP_ROWS).replace(/^\n+/, ""),
-    browsingHistory: `Recent browsing (simulated):
-
-Cat scratching post, adult cat food`,
+    browsingHistory: `Cat scratching post, adult cat food`,
   },
 ];
 

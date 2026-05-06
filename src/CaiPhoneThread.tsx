@@ -1,11 +1,18 @@
-import type { RefObject } from "react";
+import { CaiOrderPickFollowup } from "./CaiOrderPickFollowup";
 import { CaiOrderShowcase } from "./CaiOrderShowcase";
 import { CaiProductShowcase } from "./CaiProductShowcase";
-import type { ChatMessage } from "./chatUtils";
+import type { CaiOrderItem, ChatMessage, OrderPickState } from "./chatUtils";
 import { ConnectWithVetIngressCard } from "./ConnectWithVetIngressCard";
 import { CaiAssistantLeadContent } from "./CaiAssistantLeadContent";
-import { formatChatTimestamp, parseAssistantMessage } from "./chatUtils";
+import { CaiReturnExchangePanel } from "./CaiReturnExchangePanel";
+import { OrderHelpLeadInSerial } from "./OrderHelpLeadInSerial";
 import { WelcomePhoneContent } from "./welcomePhone";
+import {
+  ORDER_HELP_LOADING_LEAD_IN,
+  formatChatTimestamp,
+  fullMessageIndexFromTailIndex,
+  parseAssistantMessage,
+} from "./chatUtils";
 
 type Props = {
   welcomeText: string;
@@ -13,11 +20,23 @@ type Props = {
   messages: ChatMessage[];
   /** Figma 3177:61059 — timestamp row name (from pet parent profile). */
   petParentName: string;
+  /** Pet profile string (first-line name used to personalize the product-help chip). */
+  petProfile: string;
+  /** When set, that assistant turn’s order list is replaced by the selected-order + intent UI (Figma 3288:29321). */
+  orderPick: OrderPickState | null;
+  onOrderCardSelect: (messageIndex: number, order: CaiOrderItem) => void;
+  onOrderPickClear: () => void;
   /** When true, welcome’s first prompt chip is order help (gather had an order placed in the last 10 days). */
   getHelpWithOrderFirst?: boolean;
   onChipSelect: (text: string) => void;
   chatLoading: boolean;
-  bottomRef: RefObject<HTMLDivElement | null>;
+  /** Figma 3066:38124 — structured return UI after the return intent chip. */
+  returnFlowOrder: CaiOrderItem | null;
+  returnFlowLeadLoading?: boolean;
+  returnFlowHeadline?: string | null;
+  returnFlowBody?: string | null;
+  onReturnCareTeamChip: () => void;
+  onReturnStartNow: () => void;
 };
 
 /**
@@ -27,12 +46,26 @@ export function CaiPhoneThread({
   welcomeText,
   messages,
   petParentName,
+  petProfile,
+  orderPick,
+  onOrderCardSelect,
+  onOrderPickClear,
   getHelpWithOrderFirst = false,
   onChipSelect,
   chatLoading,
-  bottomRef,
+  returnFlowOrder,
+  returnFlowLeadLoading = false,
+  returnFlowHeadline = null,
+  returnFlowBody = null,
+  onReturnCareTeamChip,
+  onReturnStartNow,
 }: Props) {
   const tail = messages.length > 0 && messages[0].role === "assistant" ? messages.slice(1) : messages;
+  const lastMessage = messages[messages.length - 1];
+  const interimOrderHelpLeadInShowing =
+    chatLoading &&
+    lastMessage?.role === "assistant" &&
+    lastMessage.content === ORDER_HELP_LOADING_LEAD_IN;
 
   return (
     <div className="cai-thread" aria-label="Conversation with Cai">
@@ -62,6 +95,17 @@ export function CaiPhoneThread({
             </div>
           );
         }
+        const isInterimOrderHelpLeadIn =
+          chatLoading && m.content === ORDER_HELP_LOADING_LEAD_IN && i === tail.length - 1;
+
+        if (isInterimOrderHelpLeadIn) {
+          return (
+            <div key={`a-${i}`} className="cai-msg-ai">
+              <OrderHelpLeadInSerial variant="phone" />
+            </div>
+          );
+        }
+
         const {
           body,
           bodyAfterVet,
@@ -75,6 +119,9 @@ export function CaiPhoneThread({
         } = parseAssistantMessage(m.content);
         const sectionTitle = products?.heading?.trim() || "Recommendation";
         const ordersSectionTitle = orders?.heading?.trim();
+        const messageIndex = fullMessageIndexFromTailIndex(i, messages);
+        const pickHere = Boolean(orderPick && orderPick.messageIndex === messageIndex);
+        const pick = pickHere ? orderPick : null;
         return (
           <div key={`a-${i}`} className="cai-msg-ai">
             {body.trim() ? <CaiAssistantLeadContent text={body} variant="phone" /> : null}
@@ -89,7 +136,21 @@ export function CaiPhoneThread({
                 {ordersSectionTitle ? (
                   <h3 className="cai-recommendation-section__title">{ordersSectionTitle}</h3>
                 ) : null}
-                <CaiOrderShowcase block={orders} />
+                {pick ? (
+                  <CaiOrderPickFollowup
+                    variant="phone"
+                    order={pick.order}
+                    petParentName={petParentName}
+                    petProfile={petProfile}
+                    pickedAt={pick.pickedAt}
+                    chatLoading={chatLoading}
+                    hideIntentChips={Boolean(returnFlowOrder)}
+                    onDifferentOrder={onOrderPickClear}
+                    onIntentChip={onChipSelect}
+                  />
+                ) : (
+                  <CaiOrderShowcase block={orders} onSelectOrder={(o) => onOrderCardSelect(messageIndex, o)} />
+                )}
               </section>
             ) : null}
             {products ? (
@@ -122,7 +183,22 @@ export function CaiPhoneThread({
         );
       })}
 
-      {chatLoading ? (
+      {returnFlowOrder ? (
+        <div className="cai-msg-ai">
+          <CaiReturnExchangePanel
+            variant="phone"
+            order={returnFlowOrder}
+            leadLoading={returnFlowLeadLoading}
+            headline={returnFlowHeadline}
+            body={returnFlowBody}
+            actionsDisabled={chatLoading}
+            onCareTeamChip={onReturnCareTeamChip}
+            onStartReturnNow={onReturnStartNow}
+          />
+        </div>
+      ) : null}
+
+      {(chatLoading && !interimOrderHelpLeadInShowing) || returnFlowLeadLoading ? (
         <div className="cai-msg-ai cai-msg-ai--typing" aria-live="polite">
           <p className="cai-typing-pill">
             <span className="cai-typing-brand">Cai </span>
@@ -131,7 +207,7 @@ export function CaiPhoneThread({
         </div>
       ) : null}
 
-      <div ref={bottomRef} className="cai-thread-end" />
+      <div className="cai-thread-end" aria-hidden />
     </div>
   );
 }

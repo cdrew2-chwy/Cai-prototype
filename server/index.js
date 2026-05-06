@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import cors from "cors";
@@ -12,9 +13,11 @@ import {
 } from "./welcomePrompt.js";
 import { ensureVetIngressInReply } from "./vetIngressGuard.js";
 import { ensureVetAlternatePathChips } from "./vetFollowUpChipsGuard.js";
-import { ensureOrderCardsInReply } from "./orderHelpGuard.js";
+import { ensureOrderCardsInReply, wantsOrderHelp } from "./orderHelpGuard.js";
 import { orderBlockForLlmBundle } from "./orderContextBundle.js";
 import { enrichOrderHistoryWithPdpData } from "./chewyPdpEnrich.js";
+import { handleChewyProductImageRequest } from "./chewyImageProxy.js";
+import { generateReturnExchangePanelCopy } from "./returnExchangePanelCopy.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Load .env from project root (parent of /server)
@@ -38,8 +41,33 @@ app.use(express.json({ limit: "256kb" }));
 
 const MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 
+/** Optional cap on assistant reply length (faster / cheaper). Omit or empty = API default (no cap). */
+function maxOutputTokens(envName) {
+  const raw = process.env[envName];
+  if (raw === undefined || raw === "") return undefined;
+  const n = Number.parseInt(String(raw), 10);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}
+
+const MAX_WELCOME_TOKENS = maxOutputTokens("OPENAI_MAX_TOKENS_WELCOME");
+const MAX_CHAT_TOKENS = maxOutputTokens("OPENAI_MAX_TOKENS_CHAT");
+
+let openaiSingleton = null;
+function openaiClient(key) {
+  if (!openaiSingleton) openaiSingleton = new OpenAI({ apiKey: key });
+  return openaiSingleton;
+}
+
+/** Keep in sync with `START_RETURN_OR_EXCHANGE_CHIP` in `src/chatUtils.ts`. */
+const START_RETURN_OR_EXCHANGE_CHIP = "Start a return or exchange";
+
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true, model: MODEL, hasKey: Boolean(apiKey()) });
+});
+
+/** Browser-safe load of Chewy / Scene7 product art (avoids CDN hotlink blocks on `<img src>`). */
+app.get("/api/chewy-product-image", (req, res) => {
+  void handleChewyProductImageRequest(req, res);
 });
 
 /**
@@ -90,7 +118,7 @@ app.post("/api/welcome", async (req, res) => {
       browseBlock,
     ].join("\n");
 
-    const openai = new OpenAI({ apiKey: key });
+    const openai = openaiClient(key);
 
     const completion = await openai.chat.completions.create({
       model: MODEL,
@@ -108,6 +136,7 @@ app.post("/api/welcome", async (req, res) => {
         },
       ],
       temperature: 0.75,
+      ...(MAX_WELCOME_TOKENS ? { max_tokens: MAX_WELCOME_TOKENS } : {}),
     });
 
     const welcome = completion.choices[0]?.message?.content ?? "";
@@ -121,9 +150,9 @@ app.post("/api/welcome", async (req, res) => {
 
 /**
  * POST /api/chat
- * Body: { messages: { role: 'user'|'assistant', content: string }[], context?: string, orderHistory?: unknown[] }
- * Prototype: plain text only. In the Chewy app, pair replies with verified product payloads and
- * in-app cart / checkout / return handlers (see file header above).
+ * Body: { messages, context?, orderHistory?, returnExchangePanelCopy?: boolean }
+ * — Default: assistant reply string. If `returnExchangePanelCopy` is true and the latest user
+ *   message is **Start a return or exchange**, responds with `{ headline, body }` JSON strings only.
  */
 app.post("/api/chat", async (req, res) => {
   try {
@@ -135,11 +164,8 @@ app.post("/api/chat", async (req, res) => {
       return;
     }
 
-    const { messages, context, orderHistory: orderHistoryBody } = req.body || {};
-    let orderHistory = orderHistoryBody;
-    if (Array.isArray(orderHistory) && orderHistory.length > 0) {
-      orderHistory = await enrichOrderHistoryWithPdpData(orderHistory);
-    }
+    const { messages, context, orderHistory: orderHistoryBody, returnExchangePanelCopy } = req.body || {};
+
     if (!Array.isArray(messages) || messages.length === 0) {
       res.status(400).json({ error: "Expected body.messages as a non-empty array." });
       return;
@@ -153,17 +179,59 @@ app.post("/api/chat", async (req, res) => {
       }
     }
 
-    const openai = new OpenAI({ apiKey: key });
+    if (returnExchangePanelCopy === true && latestUserText.trim() === START_RETURN_OR_EXCHANGE_CHIP) {
+      const openai = openaiClient(key);
+      const contextStr = typeof context === "string" ? context : "";
+      const copy = await generateReturnExchangePanelCopy({
+        openai,
+        model: MODEL,
+        messages,
+        contextStr,
+      });
+      if (!copy) {
+        res.status(502).json({ error: "Return panel copy could not be generated." });
+        return;
+      }
+      res.json(copy);
+      return;
+    }
 
-    const systemContent =
+    let orderHistory = orderHistoryBody;
+    /**
+     * PDP enrichment is the main latency hit (sequential https://www.chewy.com fetches + stagger).
+     * Only run when the user is in an order-help turn — the only case where we inject ```cai-orders```
+     * and need product titles/images on cards. Shopping and general chat skip this entirely.
+     */
+    if (Array.isArray(orderHistory) && orderHistory.length > 0 && wantsOrderHelp(latestUserText)) {
+      orderHistory = await enrichOrderHistoryWithPdpData(orderHistory);
+    }
+
+    const openai = openaiClient(key);
+
+    let systemContent =
       typeof context === "string" && context.trim()
         ? `${CAI_SYSTEM_PROMPT}\n\nDeveloper-provided context (may be empty in prototype):\n${context.trim()}`
         : `${CAI_SYSTEM_PROMPT}\n\nDeveloper-provided context (may be empty in prototype):\n(none)`;
+
+    if (
+      wantsOrderHelp(latestUserText) &&
+      Array.isArray(orderHistory) &&
+      orderHistory.length > 0
+    ) {
+      systemContent +=
+        "\n\nOrder-help pacing (strict): The UI may already have shown thanks + digging up recent orders + “just a moment” **before** this reply. Treat that as **done**. In **your** words (before any injected ```cai-orders``` block): **do not** paraphrase loading/waiting, **do not** say you are fetching/digging/pulling/grabbing/loading orders or details again, and **do not** pair “let’s get started” with retrieving orders. Write **one short new angle only**: headline + how to use the cards (tap which order, what you’ll help with). Skip pet metaphors about **retrieving** orders entirely on this turn.";
+    }
+
+    if (latestUserText.trim() === START_RETURN_OR_EXCHANGE_CHIP) {
+      systemContent +=
+        "\n\nPrototype return chip: The parent chose **Start a return or exchange** after confirming **which order** in the UI. **Never** tell them to tap or pick an order from the card list again. **Never** stack another generic opener such as “I can help with that,” “Got it,” or “please tap an order”—those beats may already exist above. Add **only** net-new guidance (policy nuance, empathy for the hassle, what happens next on Chewy), or stay to **one** tight sentence.";
+    }
 
     const completion = await openai.chat.completions.create({
       model: MODEL,
       messages: [{ role: "system", content: systemContent }, ...messages],
       temperature: 0.7,
+      ...(MAX_CHAT_TOKENS ? { max_tokens: MAX_CHAT_TOKENS } : {}),
     });
 
     const rawReply = completion.choices[0]?.message?.content ?? "";
@@ -185,7 +253,23 @@ app.post("/api/chat", async (req, res) => {
   }
 });
 
+/** After `npm run build`, serve the Vite app so one process exposes UI + `/api` (same origin). */
+const distDir = path.join(__dirname, "..", "dist");
+const distIndex = path.join(distDir, "index.html");
+if (fs.existsSync(distIndex)) {
+  app.use(express.static(distDir));
+  app.use((req, res, next) => {
+    if (req.method !== "GET" || req.path.startsWith("/api")) return next();
+    res.sendFile(distIndex, next);
+  });
+}
+
 const PORT = Number(process.env.PORT) || 3001;
-app.listen(PORT, () => {
-  console.log(`Cai API listening on http://127.0.0.1:${PORT}`);
+const HOST = (process.env.HOST || "0.0.0.0").trim() || "0.0.0.0";
+app.listen(PORT, HOST, () => {
+  const where = HOST === "0.0.0.0" ? "all interfaces" : HOST;
+  console.log(`Cai listening on http://${HOST === "0.0.0.0" ? "127.0.0.1" : HOST}:${PORT}/ (${where})`);
+  if (!fs.existsSync(distIndex)) {
+    console.log("Tip: run `npm run build` then `npm start` to serve the web UI from this process.");
+  }
 });

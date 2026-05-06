@@ -5,6 +5,8 @@
  * `orderHistoryFromShopping.ts`. Server applies last-6-months in `orderHelpGuard.js`.
  */
 
+import type { PrototypeOrderRow } from "./orderHistoryFromShopping";
+
 export type { PrototypeOrderRow } from "./orderHistoryFromShopping";
 export { STRUCTURED_ORDER_HISTORY_MARKER, formatStructuredOrderHistoryAppend } from "./orderHistoryFromShopping";
 

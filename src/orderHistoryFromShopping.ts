@@ -11,7 +11,13 @@ export type PrototypeOrderRow = {
   status?: string;
   /** ISO date (server applies last-6-months rule). */
   placedAt: string;
+  /** When set, delivered / “Arrived …” U.I. uses this date instead of `placedAt`. */
+  deliveredAt?: string;
   imageUrl?: string;
+  /** Preserved PDP URL when enrich replaces `summary` but cannot attach `imageUrl`. */
+  productPageUrl?: string;
+  /** Optional list price (USD) from product catalog. */
+  listPrice?: number;
   /** When true, this order is on Autoship (from gather; copied into `meta` for the model). */
   autoship?: boolean;
 };
@@ -33,8 +39,22 @@ function tryParseOrderArray(data: unknown): PrototypeOrderRow[] {
     const meta = typeof o.meta === "string" && o.meta.trim() ? o.meta.trim() : undefined;
     const status = typeof o.status === "string" && o.status.trim() ? o.status.trim() : undefined;
     const imageUrl = typeof o.imageUrl === "string" && o.imageUrl.trim() ? o.imageUrl.trim() : undefined;
+    const deliveredRaw = o.deliveredAt ?? o.delivered_at;
+    const deliveredAt =
+      typeof deliveredRaw === "string" && deliveredRaw.trim() ? deliveredRaw.trim() : undefined;
+    const productPageUrl =
+      typeof o.productPageUrl === "string" && o.productPageUrl.trim() ? o.productPageUrl.trim() : undefined;
+    let listPrice: number | undefined;
+    if (typeof o.listPrice === "number" && Number.isFinite(o.listPrice)) listPrice = o.listPrice;
+    else if (typeof o.listPrice === "string" && o.listPrice.trim()) {
+      const n = Number(o.listPrice.trim());
+      if (!Number.isNaN(n)) listPrice = n;
+    }
     const base: PrototypeOrderRow = { id, orderNumber, summary, meta, status, placedAt, imageUrl };
     if (o.autoship === true) base.autoship = true;
+    if (deliveredAt) base.deliveredAt = deliveredAt;
+    if (productPageUrl) base.productPageUrl = productPageUrl;
+    if (listPrice != null) base.listPrice = listPrice;
     out.push(base);
   }
   return out;

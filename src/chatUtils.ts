@@ -7,6 +7,13 @@ export type ChatMessage = {
   sentAt?: number;
 };
 
+/**
+ * Maps a `CaiPhoneThread` tail index to the index in `messages` (tail omits index 0 when it is the welcome assistant).
+ */
+export function fullMessageIndexFromTailIndex(tailIndex: number, messages: ChatMessage[]): number {
+  return messages.length > 0 && messages[0]?.role === "assistant" ? tailIndex + 1 : tailIndex;
+}
+
 /** First name for Figma “Customer message” name slot — strips labels like “Name:” and uses the first word. */
 export function extractPetParentDisplayName(profile: string): string {
   const rawLine = profile.trim().split(/\n/)[0]?.trim() ?? "";
@@ -19,6 +26,21 @@ export function extractPetParentDisplayName(profile: string): string {
   const firstName = withoutLabel.split(/\s+/)[0] ?? "";
   if (!firstName) return "Pet parent";
   return firstName.length > 36 ? `${firstName.slice(0, 33)}…` : firstName;
+}
+
+/**
+ * Pet name for personalized copy in some flows (order-help chips use fixed Figma labels in the UI).
+ * Uses the first line of the pet profile before an em dash or similar separator.
+ */
+export function extractPetCallingName(petProfile: string): string {
+  const raw = (petProfile.split("\n")[0] ?? "").replace(/^example:\s*/i, "").trim();
+  if (!raw) return "your pet";
+  const beforeSep = raw.split(/[—–-]/)[0]?.trim() ?? raw;
+  const token = (beforeSep.split(/\s+/)[0] ?? "").replace(/^[^A-Za-z]+/, "");
+  if (!token || token.length < 2) return "your pet";
+  if (/^(example|my|the|our|pet|dog|cat|two|one|all|both)$/i.test(token)) return "your pet";
+  if (!/^[A-Za-z][A-Za-z'-]{1,23}$/.test(token)) return "your pet";
+  return token;
 }
 
 /** Figma-style time e.g. “9:41 p.m.” */
@@ -185,8 +207,17 @@ export type CaiOrderItem = {
   meta?: string;
   status?: string;
   placedAt?: string;
+  /** When set, “Arrived …” for delivered orders uses this date; otherwise `placedAt`. */
+  deliveredAt?: string;
   /** When set, shown in the leading 56px tile; otherwise a package placeholder is used. */
   imageUrl?: string;
+  /**
+   * Original Chewy PDP URL when the server replaced `summary` with a product title but could not
+   * set `imageUrl` (used to resolve local fallback thumbnails by `/dp/{id}`).
+   */
+  productPageUrl?: string;
+  /** Optional catalog list price (USD) when enriched from product CSV / fence JSON. */
+  listPrice?: number;
 };
 
 export type CaiOrdersBlock = {
@@ -196,11 +227,53 @@ export type CaiOrdersBlock = {
   showLoadMore?: boolean;
 };
 
-const CAI_PRODUCTS_FENCE_RE = /```cai-products\s*\n?([\s\S]*?)```/gi;
+/** After parent taps an order card (Figma 3288:29321); keyed to the assistant `messages` index. */
+export type OrderPickState = {
+  messageIndex: number;
+  order: CaiOrderItem;
+  pickedAt: number;
+};
 
-const CAI_ORDERS_FENCE_RE = /```cai-orders\s*\n?([\s\S]*?)```/gi;
+/** Order-help intent chip — opens return / exchange card flow (Figma 3066:38124). */
+export const START_RETURN_OR_EXCHANGE_CHIP = "Start a return or exchange";
 
-const CAI_VET_INGRESS_FENCE_RE = /```cai-vet-ingress\s*\n?([\s\S]*?)```/gi;
+/** Chip under return card — escalates to care team (Figma 3066:38124). */
+export const RETURN_FLOW_CARE_TEAM_CHIP = "Get help from our care team";
+
+/**
+ * Models occasionally wrap the whole reply in quotes, add zero‑width characters, or put spaces /
+ * a language tag after the opening backticks — any of that breaks strict ```cai-* fence matching so
+ * structured UI (product cards, orders, vet card) never mounts and the fence shows as raw text.
+ */
+function normalizeAssistantStructuredInput(raw: string): string {
+  let s = raw.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n");
+  s = s.replace(/[\u200B-\u200D\uFEFF]/g, "");
+
+  const t = s.trim();
+  const hasStructuredFence = /```\s*cai-(?:products|orders|vet-ingress)\b/i.test(t);
+  if (
+    hasStructuredFence &&
+    t.length >= 2 &&
+    ((t.startsWith('"') && t.endsWith('"')) || (t.startsWith("\u201C") && t.endsWith("\u201D")))
+  ) {
+    try {
+      const parsed = JSON.parse(t);
+      if (typeof parsed === "string") return parsed;
+    } catch {
+      /* not a valid JSON string; fall through */
+    }
+    const inner = t.slice(1, -1);
+    return inner.replace(/\\n/g, "\n").replace(/\\r/g, "\r").replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+  }
+  return s;
+}
+
+/** Allow optional spaces / language token after opening ``` (common markdown variance). */
+const CAI_PRODUCTS_FENCE_RE = /```\s*cai-products(?:\s+[\w.-]+)?\s*\n?([\s\S]*?)```/gi;
+
+const CAI_ORDERS_FENCE_RE = /```\s*cai-orders(?:\s+[\w.-]+)?\s*\n?([\s\S]*?)```/gi;
+
+const CAI_VET_INGRESS_FENCE_RE = /```\s*cai-vet-ingress(?:\s+[\w.-]+)?\s*\n?([\s\S]*?)```/gi;
 
 /** First ```cai-vet-ingress``` only — keeps prose before vs after the card for layout. */
 function splitFirstVetFence(raw: string): {
@@ -245,8 +318,13 @@ function splitFirstVetFence(raw: string): {
   return { beforeVet, afterVet, vetIngress: true, vetWaitSeconds, vetCardIntro };
 }
 
-function chipsFromAssistantContent(content: string): string[] {
-  const stripped = content
+/**
+ * Removes ```cai-vet-ingress```, ```cai-orders```, and ```cai-products``` fences from assistant text.
+ * Welcome UI only runs {@link parseChips}; without this, model-injected fences show as raw markdown in the welcome card.
+ */
+export function stripCaiStructuredFences(content: string): string {
+  const normalized = normalizeAssistantStructuredInput(content);
+  const stripped = normalized
     .replace(CAI_VET_INGRESS_FENCE_RE, "")
     .replace(CAI_ORDERS_FENCE_RE, "")
     .replace(CAI_PRODUCTS_FENCE_RE, "")
@@ -255,7 +333,11 @@ function chipsFromAssistantContent(content: string): string[] {
   CAI_VET_INGRESS_FENCE_RE.lastIndex = 0;
   CAI_ORDERS_FENCE_RE.lastIndex = 0;
   CAI_PRODUCTS_FENCE_RE.lastIndex = 0;
-  return parseChips(stripped).chips;
+  return stripped;
+}
+
+function chipsFromAssistantContent(content: string): string[] {
+  return parseChips(stripCaiStructuredFences(content)).chips;
 }
 
 function extractCaiOrdersFence(raw: string): {
@@ -310,7 +392,18 @@ function normalizeOrderItem(v: unknown): CaiOrderItem | null {
   const meta = typeof o.meta === "string" && o.meta.trim() ? o.meta.trim() : undefined;
   const status = typeof o.status === "string" && o.status.trim() ? o.status.trim() : undefined;
   const placedAt = typeof o.placedAt === "string" && o.placedAt.trim() ? o.placedAt.trim() : undefined;
+  const deliveredAt =
+    typeof o.deliveredAt === "string" && o.deliveredAt.trim() ? o.deliveredAt.trim() : undefined;
   const imageUrl = typeof o.imageUrl === "string" && o.imageUrl.trim() ? o.imageUrl.trim() : undefined;
+  const productPageUrl =
+    typeof o.productPageUrl === "string" && o.productPageUrl.trim() ? o.productPageUrl.trim() : undefined;
+  let listPrice: number | undefined;
+  if (typeof o.listPrice === "number" && Number.isFinite(o.listPrice)) {
+    listPrice = o.listPrice;
+  } else if (typeof o.listPrice === "string" && o.listPrice.trim()) {
+    const n = Number(o.listPrice.trim());
+    if (!Number.isNaN(n)) listPrice = n;
+  }
   return {
     id: id || orderNumber,
     orderNumber,
@@ -318,7 +411,10 @@ function normalizeOrderItem(v: unknown): CaiOrderItem | null {
     meta,
     status,
     placedAt,
+    deliveredAt,
     imageUrl,
+    productPageUrl,
+    listPrice,
   };
 }
 
@@ -698,13 +794,14 @@ function splitRecommendationProse(bodyFull: string, beforeFence: string): { lead
  * is bridge / other-care prose after the vet card, before orders/products.
  */
 export function parseAssistantMessage(content: string): ParsedAssistantMessage {
-  const { beforeVet, afterVet, vetIngress, vetWaitSeconds, vetCardIntro } = splitFirstVetFence(content);
-  const sourceForFences = vetIngress ? afterVet : content;
+  const normalized = normalizeAssistantStructuredInput(content);
+  const { beforeVet, afterVet, vetIngress, vetWaitSeconds, vetCardIntro } = splitFirstVetFence(normalized);
+  const sourceForFences = vetIngress ? afterVet : normalized;
   const ordersEx = extractCaiOrdersFence(sourceForFences);
   const { textWithoutFence, jsonText, beforeFence } = extractCaiProductsFence(ordersEx.textWithoutFence);
   const orders = ordersEx.jsonText ? parseCaiOrdersJson(ordersEx.jsonText) : null;
   const products = jsonText ? parseCaiProductsJson(jsonText) : null;
-  const chips = orders ? [] : chipsFromAssistantContent(content);
+  const chips = orders ? [] : chipsFromAssistantContent(normalized);
   const beforeFenceTrim = beforeFence.trim();
 
   let displayVetCardIntro = vetCardIntro;
@@ -782,6 +879,121 @@ export const CUSTOMER_CARE_WELCOME_CHIP = "Chat live with customer care";
 /** Suggested first prompt for order help; the welcome UI may prepend it when gather has an order placed in the last 10 days. */
 export const RECENT_ORDER_WELCOME_CHIP = "Get help with an order";
 
+/**
+ * Shown in the thread as soon as the pet parent asks for order help (when we have order rows to send),
+ * while the server enriches PDP data—so “Just a moment!” lines up with the real wait. Merged with the
+ * API reply when it returns (see {@link App} `sendUserText`). Keep in sync with server `wantsOrderHelp` triggers.
+ */
+export const ORDER_HELP_LOADING_LEAD_IN =
+  "I can help with that!\n\nLet me dig up your recent orders so we can get started.\n\nJust a moment!";
+
+/** Paragraphs for {@link ORDER_HELP_LOADING_LEAD_IN} (serial reveal in the UI while orders load). */
+export function splitOrderHelpLoadingLeadIn(): string[] {
+  return ORDER_HELP_LOADING_LEAD_IN.split(/\n\n/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Removes model paragraphs that repeat “dig/fetch/load orders” or wait-copy already shown in
+ * {@link ORDER_HELP_LOADING_LEAD_IN}—used when merging so the thread stays natural if the model drifts.
+ */
+export function stripRedundantOrderHelpModelEcho(reply: string): string {
+  const trimmed = reply.trim();
+  if (!trimmed) return trimmed;
+
+  const fenceIdx = trimmed.search(/```\s*cai-orders\b/i);
+  const head = fenceIdx >= 0 ? trimmed.slice(0, fenceIdx).trimEnd() : trimmed;
+  const tail = fenceIdx >= 0 ? trimmed.slice(fenceIdx).trimStart() : "";
+
+  const strippedHead = stripRedundantOrderHelpParagraphs(head);
+  if (!tail) return strippedHead;
+  return strippedHead ? `${strippedHead}\n\n${tail}` : tail;
+}
+
+function stripRedundantOrderHelpParagraphs(preFence: string): string {
+  const parts = preFence
+    .split(/\n\n+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (parts.length === 0) return "";
+
+  const filtered = parts.filter((p) => !orderHelpFetchEchoParagraph(p));
+  return filtered.join("\n\n").trimEnd();
+}
+
+/** True when a block mainly echoes staging copy about retrieving orders (already shown in the UI). */
+function orderHelpFetchEchoParagraph(p: string): boolean {
+  const plain = p.replace(/\*{1,2}|__/g, "").trim();
+  if (!plain || plain.length > 320) return false;
+  const lower = plain.toLowerCase();
+
+  const retrieval =
+    /\bdig(?:ging)?\s+up\b/.test(lower) ||
+    /\bfetch(?:ing)?\b/.test(lower) ||
+    /\bpull(?:ing)?\s+up\b/.test(lower) ||
+    /\bgrab(?:bing)?\b/.test(lower) ||
+    /\bretrieve\b/.test(lower) ||
+    /\blook(?:ing)?\s+up\b/.test(lower) ||
+    /\bround(?:ing)?\s+up\b/.test(lower) ||
+    (/\bloading\b/.test(lower) && /\border/.test(lower));
+
+  const ordersOrDetails = /\border/.test(lower) || /\bdetail/.test(lower);
+
+  const waitAgain =
+    /\bjust\s+a\s+moment\b/.test(lower) ||
+    /\bhang\s+tight\b/.test(lower) ||
+    /\bbear\s+with\b/.test(lower) ||
+    /\bone\s+sec(ond)?\b/.test(lower);
+
+  const letsDigUp = /\blet['']?s\s+dig\s+up\b/.test(lower);
+
+  const startedPlusRetrieval =
+    /\bget\s+started\b/.test(lower) &&
+    (retrieval || /\bso\s+i\s+(can|could)\b/.test(lower) || /\bdetail/.test(lower));
+
+  if (letsDigUp) return true;
+  if (/\bi['']?ll\b/.test(lower) && /\bfetch\b/.test(lower) && /\bdetail/.test(lower)) return true;
+  if (waitAgain && (ordersOrDetails || retrieval)) return true;
+  if (retrieval && ordersOrDetails) return true;
+  if (startedPlusRetrieval) return true;
+
+  return false;
+}
+
+/**
+ * Mirrors `server/orderHelpGuard.js` {@code wantsOrderHelp} so the client can stage the loading lead-in
+ * before `/api/chat` returns.
+ */
+export function wantsOrderHelpFromUser(userText: string): boolean {
+  const raw = (userText ?? "").trim();
+  if (!raw) return false;
+  const t = raw.toLowerCase();
+  if (t === "get help with an order") return true;
+  if (/\b(return|refund|replace|damag|missing|track|shipment|deliver|wrong item|cancel)\b/.test(t) && /\border\b/.test(t))
+    return true;
+  if (/\b(order help|help with (my |an |the )?order|my order|order status|where('?s| is) my order)\b/.test(t))
+    return true;
+  if (/\b(i'?d like to|i want to|need to)\s+(return|cancel|track)\b/.test(t)) return true;
+  return false;
+}
+
+/**
+ * True when a chip is the same intent as {@link RECENT_ORDER_WELCOME_CHIP} (model often omits “Get ” or varies articles).
+ */
+export function isOrderHelpWelcomeChipLabel(text: string): boolean {
+  const t = text.trim().toLowerCase().replace(/\s+/g, " ");
+  return /^(get\s+)?help\s+with\s+(an|your|the)\s+order(s)?\b/.test(t) || /^help\s+with\s+(an|your|the)\s+order(s)?\b/.test(t);
+}
+
+/** Stable key for welcome-chip deduping (order-help family collapses to one slot). */
+function welcomeChipDedupeKey(label: string, careLabel: string): string {
+  const n = label.trim().toLowerCase();
+  if (n === careLabel.trim().toLowerCase()) return "__care__";
+  if (isOrderHelpWelcomeChipLabel(label)) return "__order_help__";
+  return n;
+}
+
 export type FinalizeWelcomeChipsOptions = {
   /**
    * Set when gather Order history has a placed date in the last 10 days: prepends
@@ -793,6 +1005,7 @@ export type FinalizeWelcomeChipsOptions = {
 /**
  * Welcome UI: optionally prepends “Get help with an order” first, drops duplicate customer care from
  * the model, fills remaining slots, appends customer care last (max {@code maxTotal} chips).
+ * Never shows two chips for the same intent (e.g. “Help with an order” vs “Get help with an order”).
  */
 export function finalizeWelcomeChips(
   chips: string[],
@@ -802,14 +1015,19 @@ export function finalizeWelcomeChips(
   const getHelp = Boolean(options?.getHelpWithOrderFirst);
   const care = CUSTOMER_CARE_WELCOME_CHIP;
   const orderHelp = RECENT_ORDER_WELCOME_CHIP;
-  const norm = (s: string) => s.trim().toLowerCase();
 
-  const rest = chips.filter((c) => {
-    const k = norm(c);
-    if (k === norm(care)) return false;
-    if (getHelp && k === norm(orderHelp)) return false;
-    return true;
-  });
+  const seen = new Set<string>();
+  const rest: string[] = [];
+  for (const c of chips) {
+    const trimmed = c.trim();
+    if (!trimmed) continue;
+    const key = welcomeChipDedupeKey(trimmed, care);
+    if (key === "__care__") continue;
+    if (getHelp && key === "__order_help__") continue;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    rest.push(trimmed);
+  }
 
   const startSlots = getHelp ? 1 : 0;
   const roomForModel = Math.max(0, maxTotal - startSlots - 1);

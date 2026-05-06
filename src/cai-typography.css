@@ -34,6 +34,13 @@
   --typography-fs-utility-3: 13px;
   --typography-lh-utility-3: 18px;
   --typography-fw-utility-normal: 400;
+  /* Utility / Utility-3-Stronger — Figma 3619:4232 Chat prototype buttons (Chirp Button label) */
+  --typography-fw-utility-stronger: 700;
+
+  /* Product / Text-1-Strong — prompt chips (3065:29722) */
+  --typography-fs-product-text-1: 13px;
+  --typography-lh-product-text-1: 18px;
+  --typography-fw-product-text-strong: 500;
 
   /* Product / Text-2 (composer — 3145:47989) */
   --typography-fs-product-text-2: 15px;
@@ -112,6 +119,24 @@
   letter-spacing: var(--typography-ls-standard);
   color: var(--color-text-secondary);
   margin: 0;
+}
+
+.cai-text-utility-3-stronger {
+  font-family: var(--typography-text-typeface);
+  font-size: var(--typography-fs-utility-3);
+  line-height: var(--typography-lh-utility-3);
+  font-weight: var(--typography-fw-utility-stronger);
+  letter-spacing: var(--typography-ls-standard);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.cai-text-product-text-1-strong {
+  font-family: var(--typography-text-typeface);
+  font-size: var(--typography-fs-product-text-1);
+  line-height: var(--typography-lh-product-text-1);
+  font-weight: var(--typography-fw-product-text-strong);
+  letter-spacing: var(--typography-ls-standard);
 }
 
 .cai-text-product-text-2 {

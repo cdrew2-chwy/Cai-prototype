@@ -1,4 +1,5 @@
-import { finalizeWelcomeChips, parseChips, stripWelcomeMarkdownBold } from "./chatUtils";
+import { finalizeWelcomeChips, parseChips, stripCaiStructuredFences, stripWelcomeMarkdownBold } from "./chatUtils";
+import { welcomeChipGlyph } from "./welcomeChipGlyph";
 
 /** Figma 3065:29722 — welcome suggested prompts; never more than four. */
 export const MAX_WELCOME_PROMPTS = 4;
@@ -83,6 +84,40 @@ function peelClosingCta(body: string): { body: string; cta: string | null } {
   return { body: paras.slice(0, -1).join("\n\n"), cta: last };
 }
 
+/**
+ * Welcome never shows ```cai-orders``` cards — only chips. Drop model lines that tell users to tap
+ * orders “below” (they are not on this screen).
+ */
+function proseMisleadsAboutOrdersBelow(s: string): boolean {
+  const t = s.trim().toLowerCase();
+  if (!t) return false;
+  const mentionsOrders = /\b(order|orders|order help)\b/.test(t);
+  const pointsDown = /\bbelow\b/.test(t) || /\bdown here\b/.test(t);
+  if (!mentionsOrders || !pointsDown) return false;
+  return /\btap\b/.test(t) || /\bselect\b/.test(t) || /\bpick\b/.test(t) || /\bchoose\b/.test(t) || /\bone of your\b/.test(t);
+}
+
+/**
+ * Welcome never shows order cards — only prompt chips. Remove stray model lines about tapping orders
+ * “below” so workbench and phone stay consistent.
+ */
+export function stripWelcomeOrderBelowHints(text: string): string {
+  if (!text.trim()) return text;
+  const paras = text.split(/\n\n+/).map((p) => p.trim()).filter(Boolean);
+  const out = paras
+    .map((p) => {
+      const sentences = p
+        .split(/(?<=[.!?])\s+/)
+        .map((x) => x.trim())
+        .filter(Boolean);
+      const kept = sentences.filter((x) => !proseMisleadsAboutOrdersBelow(x));
+      return kept.join(" ");
+    })
+    .map((p) => p.trim())
+    .filter(Boolean);
+  return out.join("\n\n");
+}
+
 /** What appears inside the iPhone bezel: Cai’s welcome (before chat turns). */
 export function WelcomePhoneContent({
   text,
@@ -97,7 +132,7 @@ export function WelcomePhoneContent({
   /** When true, an order in gather was placed in the last 10 days; first chip is “Get help with an order.” */
   getHelpWithOrderFirst?: boolean;
 }) {
-  const stripped = stripWelcomeMarkdownBold(text);
+  const stripped = stripWelcomeMarkdownBold(stripCaiStructuredFences(text));
   const { body, chips } = parseChips(stripped);
   const welcomeChips = finalizeWelcomeChips(chips, MAX_WELCOME_PROMPTS, { getHelpWithOrderFirst });
   const main = (body || stripped).trim();
@@ -105,7 +140,11 @@ export function WelcomePhoneContent({
   const first = blocks[0] ?? "";
   const { headline, remainder } = splitHeadlineFromFirstBlock(first);
   const bodyCore = [remainder, ...blocks.slice(1)].filter(Boolean).join("\n\n").trim();
-  const { body: bodyMain, cta } = peelClosingCta(bodyCore);
+  const bodyCoreClean = stripWelcomeOrderBelowHints(bodyCore);
+  let { body: bodyMain, cta } = peelClosingCta(bodyCoreClean);
+  if (cta && proseMisleadsAboutOrdersBelow(cta)) {
+    cta = null;
+  }
 
   return (
     <div className="phone-welcome">
@@ -122,13 +161,16 @@ export function WelcomePhoneContent({
           <button
             key={`${idx}-${c}`}
             type="button"
-            className={`cai-prompt-chip${onPromptSelect ? "" : " cai-prompt-chip--locked"}`}
+            className={`cai-prompt-chip cai-prompt-chip--rich${onPromptSelect ? "" : " cai-prompt-chip--locked"}`}
             disabled={Boolean(onPromptSelect && promptsDisabled)}
             aria-disabled={!onPromptSelect}
             tabIndex={onPromptSelect ? undefined : -1}
             onClick={onPromptSelect ? () => onPromptSelect(c) : undefined}
           >
-            {c}
+            <span className="cai-prompt-chip__glyph" aria-hidden>
+              {welcomeChipGlyph(c)}
+            </span>
+            <span>{c}</span>
           </button>
         ))}
       </div>

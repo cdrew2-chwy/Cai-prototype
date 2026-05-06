@@ -8,6 +8,23 @@ export const GATHER_ORDER_STATUS_OPTIONS = [
   "Cancelled",
 ] as const;
 
+/** Statuses that show the optional expected-delivery field (free-text date hint on cards). */
+export const GATHER_ORDER_EXPECTED_DELIVERY_STATUSES: readonly (typeof GATHER_ORDER_STATUS_OPTIONS)[number][] = [
+  "Processing",
+  "In-transit",
+  "Delayed",
+];
+
+const EXPECTED_DELIVERY_STATUS_SET = new Set<string>(GATHER_ORDER_EXPECTED_DELIVERY_STATUSES);
+
+export function orderStatusShowsDeliveredDateField(status: string): boolean {
+  return (status ?? "").trim() === "Delivered";
+}
+
+export function orderStatusShowsExpectedDeliveryField(status: string): boolean {
+  return EXPECTED_DELIVERY_STATUS_SET.has((status ?? "").trim());
+}
+
 const LEGACY_TO_GATHER: Record<string, (typeof GATHER_ORDER_STATUS_OPTIONS)[number]> = {
   processing: "Processing",
   "in transit": "In-transit",
@@ -30,6 +47,8 @@ export type GatherOrderField = {
   productOrLink: string;
   /** `YYYY-MM-DD` from a date input, or empty. */
   placedDate: string;
+  /** Optional delivery date for delivered orders (“Arrived …” on cards). */
+  deliveredDate: string;
   status: string;
   expectedDelivery: string;
   /** This line item is an Autoship order. */
@@ -41,6 +60,7 @@ export function createEmptyGatherOrderField(): GatherOrderField {
     id: crypto.randomUUID(),
     productOrLink: "",
     placedDate: "",
+    deliveredDate: "",
     status: "Processing",
     expectedDelivery: "",
     autoship: false,
@@ -55,15 +75,24 @@ export function mapLegacyStatusToGather(legacy: string | undefined): string {
   return "Processing";
 }
 
-function placedAtToDateInputValue(iso: string): string {
+function isoInstantOrDateToDateInputValue(iso: string): string {
   const t = (iso ?? "").trim();
   if (!t) return "";
-  const d = new Date(t);
-  if (Number.isNaN(d.getTime())) return "";
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  const m = t.match(/^(\d{4})-(\d{2})-(\d{2})(?:[Tt ].*)?/);
+  if (m) {
+    const y = Number(m[1]);
+    const mo = Number(m[2]);
+    const d = Number(m[3]);
+    if (y >= 1900 && y <= 2200 && mo >= 1 && mo <= 12 && d >= 1 && d <= 31) {
+      return `${m[1]}-${m[2]}-${m[3]}`;
+    }
+  }
+  const dt = new Date(t);
+  if (Number.isNaN(dt.getTime())) return "";
+  const y = dt.getFullYear();
+  const mo = String(dt.getMonth() + 1).padStart(2, "0");
+  const day = String(dt.getDate()).padStart(2, "0");
+  return `${y}-${mo}-${day}`;
 }
 
 function buildOrderRowMeta(
@@ -93,14 +122,21 @@ function autoshipFromOrderMeta(meta: string | undefined, fromRow: boolean | unde
 export function prototypeRowsToFormEntries(rows: PrototypeOrderRow[], max: number = 5): GatherOrderField[] {
   const slice = rows.filter(Boolean).slice(0, max);
   if (slice.length === 0) return [createEmptyGatherOrderField()];
-  return slice.map((r) => ({
-    id: crypto.randomUUID(),
-    productOrLink: (r.summary ?? "").trim(),
-    placedDate: placedAtToDateInputValue(r.placedAt),
-    status: mapLegacyStatusToGather(r.status),
-    expectedDelivery: extractExpectedFromMeta(r.meta),
-    autoship: autoshipFromOrderMeta(r.meta, r.autoship),
-  }));
+  return slice.map((r) => {
+    const explicitStatus = (r.status ?? "").trim();
+    const hasDeliveredAt = Boolean((r.deliveredAt ?? "").trim());
+    const status =
+      !explicitStatus && hasDeliveredAt ? "Delivered" : mapLegacyStatusToGather(r.status);
+    return {
+      id: crypto.randomUUID(),
+      productOrLink: (r.summary ?? "").trim(),
+      placedDate: isoInstantOrDateToDateInputValue(r.placedAt),
+      deliveredDate: isoInstantOrDateToDateInputValue(r.deliveredAt ?? ""),
+      status,
+      expectedDelivery: extractExpectedFromMeta(r.meta),
+      autoship: autoshipFromOrderMeta(r.meta, r.autoship),
+    };
+  });
 }
 
 function dateInputToPlacedAtIso(placedDate: string): string {
@@ -163,6 +199,7 @@ export function formEntriesToPrototypeRows(entries: GatherOrderField[]): Prototy
   for (const e of entries) {
     const summary = (e.productOrLink ?? "").trim();
     const placedAt = dateInputToPlacedAtIso(e.placedDate);
+    const deliveredAtIso = dateInputToPlacedAtIso((e.deliveredDate ?? "").trim());
     if (!summary || !placedAt) continue;
     const orderNumber = nextUniqueTenDigitOrderNumber(usedOrderDigits);
     const row: PrototypeOrderRow = {
@@ -174,6 +211,7 @@ export function formEntriesToPrototypeRows(entries: GatherOrderField[]): Prototy
       meta: buildOrderRowMeta({ autoship: e.autoship, expectedDelivery: (e.expectedDelivery ?? "").trim() }),
     };
     if (e.autoship) row.autoship = true;
+    if (deliveredAtIso) row.deliveredAt = deliveredAtIso;
     out.push(row);
   }
   return out;

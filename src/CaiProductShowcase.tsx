@@ -1,4 +1,6 @@
+import addToCartIconButton from "./assets/cai-add-to-cart-icon-button.svg";
 import type { CaiProductItem, CaiProductsBlock } from "./chatUtils";
+import { useChewyRemoteImageSrc } from "./useChewyProductImageSrc";
 import "./cai-product-cards.css";
 
 function formatReviewCount(n: number): string {
@@ -8,7 +10,7 @@ function formatReviewCount(n: number): string {
   return String(n);
 }
 
-/** Parse “$56.54” → dollars + two-digit cents for superscript (matches PDP reference screenshot). */
+/** Parse “$56.54” → dollars + two-digit cents for superscript (Figma product card). */
 function parsePriceParts(raw: string): { dollars: string; cents: string | null } {
   const t = raw.replace(/,/g, "").trim();
   const m = t.match(/^\$(\d+)(?:\.(\d{1,2}))?$/);
@@ -31,123 +33,102 @@ function PriceSuperscript({ price }: { price: string }) {
   );
 }
 
-function StarRating({ rating, reviewCount }: { rating: number; reviewCount?: number }) {
-  const rounded = Math.min(5, Math.max(0, Math.round(rating)));
-  const label =
-    typeof reviewCount === "number" && reviewCount > 0
-      ? `${rounded} out of 5 stars, ${reviewCount} reviews`
-      : `${rounded} out of 5 stars`;
+function ProductTitleInline({ brand, title }: { brand?: string; title: string }) {
+  const b = brand?.trim();
+  let rest = title;
+  if (b) {
+    if (title.toLowerCase().startsWith(b.toLowerCase())) {
+      rest = title.slice(b.length).trim().replace(/^[-–—]\s*/, "");
+    }
+  }
   return (
-    <div className="cai-product-card__rating-row" aria-label={label}>
-      <span className="cai-product-card__stars" aria-hidden>
-        {Array.from({ length: 5 }, (_, i) => (
-          <span key={i} className={i < rounded ? "cai-product-card__star cai-product-card__star--on" : "cai-product-card__star"}>
-            ★
-          </span>
-        ))}
-      </span>
-      {typeof reviewCount === "number" && reviewCount > 0 ? (
-        <span className="cai-product-card__reviews">({formatReviewCount(reviewCount)})</span>
-      ) : null}
-    </div>
+    <h3 className="cai-product-card__title cai-product-card__title--recommend">
+      {b ? (
+        <>
+          <span className="cai-product-card__title-brand">{b}</span>
+          {rest ? <span className="cai-product-card__title-rest"> {rest}</span> : null}
+        </>
+      ) : (
+        <span className="cai-product-card__title-rest cai-product-card__title-rest--solo">{title}</span>
+      )}
+    </h3>
   );
 }
 
-/** Medium / simple cards — compact star row + optional deal. */
-function ProductCardDetails({ item }: { item: CaiProductItem }) {
-  return (
-    <>
-      {item.categoryLabel ? <p className="cai-product-card__eyebrow">{item.categoryLabel}</p> : null}
-      {item.badge ? <span className="cai-product-card__badge">{item.badge}</span> : null}
-      {item.brand ? <p className="cai-product-card__brand">{item.brand}</p> : null}
-      <h3 className="cai-product-card__title">{item.title}</h3>
-      {item.subtitle ? <p className="cai-product-card__subtitle">{item.subtitle}</p> : null}
-      {typeof item.rating === "number" ? (
-        <StarRating rating={item.rating} reviewCount={item.reviewCount} />
-      ) : null}
-      {item.price || item.wasPrice ? (
-        <div className="cai-product-card__price-row">
-          {item.wasPrice ? <span className="cai-product-card__was-price">{item.wasPrice}</span> : null}
-          {item.price ? <span className="cai-product-card__price">{item.price}</span> : null}
-        </div>
-      ) : null}
-      {item.dealLabel ? <p className="cai-product-card__deal">{item.dealLabel}</p> : null}
-      <span className="cai-product-card__cta" aria-hidden={Boolean(item.url)}>
-        View
-      </span>
-    </>
-  );
-}
-
-function CardMedia({ item, variant }: { item: CaiProductItem; variant?: "pdp" | "default" }) {
-  const mediaClass =
-    variant === "pdp" ? "cai-product-card__media cai-product-card__media--pdp" : "cai-product-card__media";
-  if (item.imageUrl) {
+function CardMedia({ item }: { item: CaiProductItem }) {
+  const remote = item.imageUrl?.trim();
+  const { src, referrerPolicy, onError, failed } = useChewyRemoteImageSrc(remote);
+  if (remote && !failed) {
     return (
-      <div className={mediaClass}>
-        <img className="cai-product-card__img" src={item.imageUrl} alt="" loading="lazy" />
+      <div className="cai-product-card__media cai-product-card__media--recommend">
+        <img
+          className="cai-product-card__img"
+          src={src}
+          referrerPolicy={referrerPolicy}
+          onError={onError}
+          alt=""
+          loading="lazy"
+        />
       </div>
     );
   }
   const initial = item.title.trim().charAt(0).toUpperCase() || "?";
   return (
-    <div className={`${mediaClass} cai-product-card__placeholder`}>
+    <div className="cai-product-card__media cai-product-card__media--recommend cai-product-card__placeholder">
       <span>{initial}</span>
     </div>
   );
 }
 
 /**
- * Large “top pick” — PDP layout from reference `src/assets/cai-product-card-reference.png`
- * (gallery → dots → sizes line → brand → title → At a glance → price row → CTAs → fulfillment).
+ * Single recommendation card — Figma 3571:49534 (shared for top_pick and category_options).
+ * https://www.figma.com/design/A3nyvH8N2Gx62Wfxs9opoS/CAI---Phase-3---Evolution?node-id=3571-49534
  */
-function ProductCardLarge({ item }: { item: CaiProductItem }) {
+function ProductCardRecommendation({ item, variant }: { item: CaiProductItem; variant: "stacked" | "carousel" }) {
   const dotCount = item.galleryCount ?? (item.imageUrl ? 5 : 1);
   const active = Math.min(item.galleryActiveIndex ?? 0, Math.max(0, dotCount - 1));
   const url = item.url?.trim();
+  const rootClass =
+    "cai-product-card cai-product-card--recommend" +
+    (variant === "carousel" ? " cai-product-card--recommend-carousel" : "");
 
   return (
-    <article className="cai-product-card cai-product-card--large cai-product-card--pdp" aria-label={item.title}>
-      <div className="cai-product-card__pdp-top">
-        <CardMedia item={item} variant="pdp" />
-        <div className="cai-product-card__dots" aria-hidden>
+    <article className={rootClass} aria-label={item.title}>
+      <div className="cai-product-card__recommend-top">
+        <div className="cai-product-card__recommend-image-area">
+          <CardMedia item={item} />
+        </div>
+        <div className="cai-product-card__dots cai-product-card__dots--recommend" aria-hidden>
           {Array.from({ length: dotCount }, (_, i) => (
-            <span key={i} className={`cai-product-card__dot${i === active ? " cai-product-card__dot--active" : ""}`} />
+            <span
+              key={i}
+              className={
+                i === active ? "cai-product-card__dot cai-product-card__dot--recommend-active" : "cai-product-card__dot cai-product-card__dot--recommend"
+              }
+            />
           ))}
         </div>
-        {item.sizeVariantLabel ? <p className="cai-product-card__size-variant">{item.sizeVariantLabel}</p> : null}
+        {item.sizeVariantLabel ? (
+          <p className="cai-product-card__size-variant cai-product-card__size-variant--recommend">{item.sizeVariantLabel}</p>
+        ) : null}
       </div>
 
-      <div className="cai-product-card__body cai-product-card__body--pdp">
-        {item.badge ? <span className="cai-product-card__badge cai-product-card__badge--pdp">{item.badge}</span> : null}
-        {item.brand ? <p className="cai-product-card__brand cai-product-card__brand--pdp">{item.brand}</p> : null}
-        <h3 className="cai-product-card__title cai-product-card__title--pdp">{item.title}</h3>
-        {item.subtitle ? <p className="cai-product-card__subtitle cai-product-card__subtitle--pdp">{item.subtitle}</p> : null}
-
-        {item.atAGlance && item.atAGlance.length > 0 ? (
-          <div className="cai-product-card__glance">
-            <p className="cai-product-card__glance-heading">At a glance</p>
-            <div className="cai-product-card__glance-scroll" role="list">
-              {item.atAGlance.map((label) => (
-                <span key={label} className="cai-product-card__glance-chip" role="listitem">
-                  {label}
-                </span>
-              ))}
-            </div>
-          </div>
-        ) : null}
+      <div className="cai-product-card__recommend-body">
+        <ProductTitleInline brand={item.brand} title={item.title} />
 
         {item.price || item.wasPrice ? (
-          <div className="cai-product-card__commercial">
-            <div className="cai-product-card__commercial-left">
-              {item.wasPrice ? <span className="cai-product-card__was-price cai-product-card__was-price--pdp">{item.wasPrice}</span> : null}
-              <span className="cai-product-card__price-slot">
+          <div className="cai-product-card__commercial cai-product-card__commercial--recommend">
+            <div className="cai-product-card__commercial-left cai-product-card__commercial-left--recommend">
+              {item.wasPrice ? (
+                <span className="cai-product-card__was-price cai-product-card__was-price--recommend">{item.wasPrice}</span>
+              ) : null}
+              <div className="cai-product-card__price-slot cai-product-card__price-slot--recommend">
                 {item.price ? <PriceSuperscript price={item.price} /> : null}
                 {item.unitPrice ? <span className="cai-product-card__unit-price">{item.unitPrice}</span> : null}
-              </span>
+              </div>
             </div>
             {typeof item.rating === "number" ? (
-              <div className="cai-product-card__commercial-rating" aria-label="Average rating">
+              <div className="cai-product-card__commercial-rating cai-product-card__commercial-rating--recommend" aria-label="Average rating">
                 <span className="cai-product-card__rating-value">{item.rating.toFixed(1)}</span>
                 <span className="cai-product-card__rating-singleton" aria-hidden>
                   ★
@@ -160,53 +141,34 @@ function ProductCardLarge({ item }: { item: CaiProductItem }) {
           </div>
         ) : null}
 
-        <div className="cai-product-card__actions">
-          <button type="button" className="cai-product-card__btn cai-product-card__btn--cart" disabled>
-            Add to cart
+        <div className="cai-product-card__actions cai-product-card__actions--recommend">
+          <button type="button" className="cai-product-card__btn-icon-cart" disabled aria-label="Add to cart">
+            <img
+              className="cai-product-card__cart-icon-img"
+              src={addToCartIconButton}
+              alt=""
+              width={40}
+              height={40}
+              decoding="async"
+            />
           </button>
           {url ? (
-            <a className="cai-product-card__btn cai-product-card__btn--buy" href={url} target="_blank" rel="noopener noreferrer">
+            <a className="cai-product-card__btn cai-product-card__btn--buy-recommend" href={url} target="_blank" rel="noopener noreferrer">
               Buy it now
             </a>
           ) : (
-            <button type="button" className="cai-product-card__btn cai-product-card__btn--buy" disabled>
+            <button type="button" className="cai-product-card__btn cai-product-card__btn--buy-recommend" disabled>
               Buy it now
             </button>
           )}
         </div>
 
-        <p className="cai-product-card__fulfillment">Free 1-3 day delivery on this item • Free 365-day returns</p>
+        <p className="cai-product-card__fulfillment-v2">
+          <span className="cai-product-card__fulfillment-strong">Free</span> 1-3 day delivery on this item
+          <br />
+          <span className="cai-product-card__fulfillment-strong">Free</span> 365-day returns
+        </p>
       </div>
-    </article>
-  );
-}
-
-function ProductCardMedium({ item }: { item: CaiProductItem }) {
-  const inner = (
-    <>
-      <CardMedia item={item} />
-      <div className="cai-product-card__body">
-        <ProductCardDetails item={item} />
-      </div>
-    </>
-  );
-
-  if (item.url) {
-    return (
-      <a
-        className="cai-product-card cai-product-card--medium cai-product-card--link"
-        href={item.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label={`${item.title} — view product`}
-      >
-        {inner}
-      </a>
-    );
-  }
-  return (
-    <article className="cai-product-card cai-product-card--medium" aria-label={item.title}>
-      {inner}
     </article>
   );
 }
@@ -230,7 +192,7 @@ export function CaiProductShowcase({ block, suppressHeading = false }: ShowcaseP
     return (
       <div className="cai-product-showcase">
         {headingEl}
-        <ProductCardLarge item={item} />
+        <ProductCardRecommendation item={item} variant="stacked" />
       </div>
     );
   }
@@ -240,7 +202,7 @@ export function CaiProductShowcase({ block, suppressHeading = false }: ShowcaseP
       {headingEl}
       <div className="cai-product-carousel" role="region" aria-label="Product options">
         {block.items.map((item, i) => (
-          <ProductCardMedium key={`${item.title}-${i}`} item={item} />
+          <ProductCardRecommendation key={`${item.title}-${i}`} item={item} variant="carousel" />
         ))}
       </div>
     </div>

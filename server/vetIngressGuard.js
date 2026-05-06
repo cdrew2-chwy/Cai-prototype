@@ -5,16 +5,37 @@
 
 const VET_FENCE = "\n\n```cai-vet-ingress\n{}\n```";
 
+/** Scratch posts/pads are catalog shopping, not “pet is scratching” dermatology—unless other symptoms appear. */
+function isScratchSurfaceShoppingQuery(t) {
+  return /\bscratch(?:ing)?(?:[\s-]+posts?|[\s-]+pads?)\b/i.test(t);
+}
+
+/** True when “scratching” reads like skin/ears/behavior, not like “scratching post” product copy. */
+function hasDermatologicScratchingConcern(t) {
+  return (
+    /\b(itch|itchy|bald|hot\s*spot|dermatitis)\b/i.test(t) ||
+    /\bscratch(?:ing|es)?\s+at\b/i.test(t) ||
+    /\b(won'?t|can'?t)\s+stop\s+scratching\b/i.test(t) ||
+    /\b(constantly|excessively|non-?stop)\s+scratching\b/i.test(t) ||
+    /\bscratching\b.*\b(skin|paw|ear|fur|coat|bleed|raw|red)\b/i.test(t)
+  );
+}
+
 /** True if the latest user message reads like a health / injury / symptom concern for a pet. */
 export function petHealthUserTurnWantsVetCard(userText) {
   const t = (userText || "").trim();
   if (!t) return false;
 
+  if (isScratchSurfaceShoppingQuery(t) && !hasDermatologicScratchingConcern(t)) {
+    return false;
+  }
+
   const signals = [
     /\b(wound|wounds|cut|cuts|scrape|scrapes|abrasion|bleed|bleeding|gash)\b/i,
     /\b(limp|lame|lameness|limping|stiffness|stiff|favoring\s+a\s+leg)\b/i,
     /\b(vomit|vomiting|threw\s+up|regurgitat|diarrh|loose\s+stool|not\s+eating|won'?t\s+eat|loss\s+of\s+appetite)\b/i,
-    /\b(itch|itchy|scratching|flakey|flaky|skin\s+issue)\b/i,
+    // "Scratching" alone often means skin; exclude "scratching post(s)" / hyphenated variants (shopping).
+    /\b(itch|itchy|scratching(?![\s-]+posts?\b)|flakey|flaky|skin\s+issue)\b/i,
     /\b(lump|mass|tumor|tumour|bump)\b/i,
     /\b(seizure|collapsed?|lethargic|lethargy|won'?t\s+get\s+up)\b/i,
     /\b(cough|sneez|wheez)\b/i,
