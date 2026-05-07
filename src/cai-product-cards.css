@@ -122,6 +122,17 @@
   background: linear-gradient(135deg, #e8ecf8 0%, #f0ebe6 100%);
 }
 
+/* Figma 3645:47128 — generic art on white when Chewy image is missing or fails to load */
+.cai-product-card__media--recommend.cai-product-card__media--generic-fallback {
+  background: #fff;
+  /* PDP thumbs cap at 160px; generic bag reads small — show ~30% larger in the same frame */
+  max-height: 208px;
+}
+
+.cai-product-card__media--recommend .cai-product-card__img.cai-product-card__img--generic-fallback {
+  max-height: 208px;
+}
+
 .cai-product-card__media--recommend.cai-product-card__placeholder span {
   font-size: 40px;
 }

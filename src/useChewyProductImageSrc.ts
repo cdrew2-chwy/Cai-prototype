@@ -4,6 +4,9 @@ import type { CaiOrderItem } from "./chatUtils";
 import { orderCardLocalFallbackSrc, orderCardThumbSrc } from "./chewyOrderImageFallback";
 import { proxiedChewyProductImageUrl, shouldProxyChewyProductImageUrl } from "./chewyImageProxyUrl";
 
+/** Figma 3645:47128 — generic bag + Chewy “c” when catalog image fails or is absent (recommendation cards). */
+export const CAI_PRODUCT_CARD_GENERIC_FALLBACK = "/cai-product-image-generic-fallback.png";
+
 type RefPol = ImgHTMLAttributes<HTMLImageElement>["referrerPolicy"];
 
 /** Remote catalog image: proxied API URL first, then direct CDN on error. */

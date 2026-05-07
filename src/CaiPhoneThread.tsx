@@ -128,7 +128,7 @@ export function CaiPhoneThread({
             {vetIngress ? <ConnectWithVetIngressCard waitSeconds={vetWaitSeconds} intro={vetCardIntro} /> : null}
             {bodyAfterVet?.trim() ? (
               <div className="cai-msg-ai-body-after-vet">
-                <CaiAssistantLeadContent text={bodyAfterVet} variant="phone" />
+                <CaiAssistantLeadContent text={bodyAfterVet} variant="afterVet" />
               </div>
             ) : null}
             {orders ? (

@@ -11,7 +11,7 @@ import {
   normalizeFirstTimeExperienceWithCai,
   normalizeOrderPlacedInLast10Days,
 } from "./welcomePrompt.js";
-import { ensureVetIngressInReply } from "./vetIngressGuard.js";
+import { ensureVetIngressInReply, connectWithVetIngressChipTurn } from "./vetIngressGuard.js";
 import { ensureVetAlternatePathChips } from "./vetFollowUpChipsGuard.js";
 import { ensureOrderCardsInReply, wantsOrderHelp } from "./orderHelpGuard.js";
 import { orderBlockForLlmBundle } from "./orderContextBundle.js";
@@ -227,6 +227,11 @@ app.post("/api/chat", async (req, res) => {
         "\n\nPrototype return chip: The parent chose **Start a return or exchange** after confirming **which order** in the UI. **Never** tell them to tap or pick an order from the card list again. **Never** stack another generic opener such as “I can help with that,” “Got it,” or “please tap an order”—those beats may already exist above. Add **only** net-new guidance (policy nuance, empathy for the hassle, what happens next on Chewy), or stay to **one** tight sentence.";
     }
 
+    if (connectWithVetIngressChipTurn(latestUserText)) {
+      systemContent +=
+        "\n\nPrototype chip: The parent tapped **Connect with a Vet**. Write **one short block** of supplemental copy first: warm, non-diagnostic, and clearly hand them off to **Connect with a Vet** / **licensed vet techs** (not “veterinarians” for the chat agents). Then output ```cai-vet-ingress``` JSON on its own line (use `\"intro\": \"\"` when your prose already introduced the feature so the card does not repeat a pitch). After the closing ``` of that fence, you may add a brief “meanwhile on Chewy” angle if helpful. End the message with **CHIPS:** as the **last line** (3–4 tappable **health and care** shopping paths—OTC wellness, first-aid, hydration, condition-typed support—not unrelated retail).";
+    }
+
     const completion = await openai.chat.completions.create({
       model: MODEL,
       messages: [{ role: "system", content: systemContent }, ...messages],
@@ -241,6 +246,7 @@ app.post("/api/chat", async (req, res) => {
         ensureVetIngressInReply(rawReply, latestUserText),
         contextStr,
         latestUserText,
+        messages,
       ),
       latestUserText,
       orderHistory,

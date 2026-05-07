@@ -144,6 +144,7 @@
 
 .cai-order-pick-flow .cai-prompt-chip__glyph {
   background: transparent;
+  overflow: hidden;
 }
 
 .cai-order-pick-flow__intentStack {
@@ -196,6 +197,7 @@
   background: transparent;
   color: #4657c7;
   padding: 0;
+  overflow: hidden;
 }
 
 .cai-order-pick-intent__label {
@@ -213,9 +215,12 @@
   line-height: 1;
   width: 24px;
   height: 24px;
+  max-width: 24px;
+  max-height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
   font-variation-settings:
     "FILL" 0,
     "wght" 400,

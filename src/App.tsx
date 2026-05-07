@@ -1,9 +1,10 @@
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, type HTMLAttributes, type ReactNode, useMemo, useState } from "react";
 import { apiUrl, readJson } from "./api";
 import { CaiAssistantLeadContent } from "./CaiAssistantLeadContent";
 import { CaiOrderPickFollowup } from "./CaiOrderPickFollowup";
 import { CaiOrderShowcase } from "./CaiOrderShowcase";
 import { CaiPhoneScreen } from "./CaiPhoneScreen";
+import { CaiChatHistorySheet } from "./CaiChatHistorySheet";
 import { CaiPhoneThread } from "./CaiPhoneThread";
 import { CaiReturnExchangePanel } from "./CaiReturnExchangePanel";
 import { OrderHelpLeadInSerial } from "./OrderHelpLeadInSerial";
@@ -39,10 +40,60 @@ import {
   type GatherOrderField,
 } from "./gatherOrderForm";
 import { getSessionPersona, SESSION_PERSONA_CUSTOM, SESSION_PERSONAS } from "./sessionPersonas";
+import {
+  buildPersonalizedMockChatHistory,
+  formatHistoryMonthDay,
+  titleFromArchivedMessages,
+  type ChatHistoryListItem,
+} from "./caiChatHistory";
 import "./App.css";
 import "./cai-phone.css";
 
 type Phase = "gather" | "welcome" | "chat";
+
+/**
+ * Preset personas: collapse session detail blocks into accordions. Custom keeps a flat layout for faster editing.
+ */
+function GatherSessionFieldBlock({
+  accordion,
+  summaryTitle,
+  summaryHint,
+  fieldBlockProps,
+  children,
+}: {
+  accordion: boolean;
+  summaryTitle: ReactNode;
+  summaryHint?: string;
+  fieldBlockProps?: HTMLAttributes<HTMLDivElement>;
+  children: ReactNode;
+}) {
+  const { className: fieldBlockClassName, ...fieldBlockRest } = fieldBlockProps ?? {};
+  const flatClass = ["field-block", fieldBlockClassName].filter(Boolean).join(" ");
+  const accordionPanelClass = ["field-block", "gather-accordion__field-block", fieldBlockClassName].filter(Boolean).join(" ");
+
+  if (!accordion) {
+    return (
+      <div className={flatClass} {...fieldBlockRest}>
+        {children}
+      </div>
+    );
+  }
+  return (
+    <details className="gather-accordion">
+      <summary className="gather-accordion__summary">
+        <span className="gather-accordion__summary-text">
+          <span className="gather-accordion__title">{summaryTitle}</span>
+          {summaryHint ? <span className="gather-accordion__hint">{summaryHint}</span> : null}
+        </span>
+      </summary>
+      <div className="gather-accordion__panel">
+        <div className={accordionPanelClass} {...fieldBlockRest}>
+          {children}
+        </div>
+      </div>
+    </details>
+  );
+}
 
 /** LLM-written lead for the return / exchange panel (not hardcoded marketing lines). */
 type ReturnFlowLead = { headline: string; body: string };
@@ -122,6 +173,9 @@ export default function App() {
   const [firstTimeExperienceWithCai, setFirstTimeExperienceWithCai] = useState(true);
   /** Gather: pre-filled persona vs typing your own (`sessionPersonas.ts`). */
   const [sessionPersonaId, setSessionPersonaId] = useState<string>(SESSION_PERSONA_CUSTOM);
+  const [historySheetOpen, setHistorySheetOpen] = useState(false);
+  const [archivedChatSessions, setArchivedChatSessions] = useState<ChatHistoryListItem[]>([]);
+  const [historyMocksHidden, setHistoryMocksHidden] = useState(false);
 
   /** From gather Order history: at least one row with product + placed date in the last 10 days. */
   const getHelpWithOrderFirst = useMemo(
@@ -129,9 +183,22 @@ export default function App() {
     [orderEntries]
   );
 
+  const chatHistoryEntries = useMemo(() => {
+    if (firstTimeExperienceWithCai) return [];
+    const mocks = historyMocksHidden ? [] : buildPersonalizedMockChatHistory(petProfile, orderEntries);
+    return [...archivedChatSessions, ...mocks];
+  }, [firstTimeExperienceWithCai, historyMocksHidden, petProfile, orderEntries, archivedChatSessions]);
+
+  const canClearChatHistory =
+    !firstTimeExperienceWithCai && (archivedChatSessions.length > 0 || !historyMocksHidden);
+
   function applySessionPersona(id: string) {
     if (id === SESSION_PERSONA_CUSTOM) {
       setSessionPersonaId(SESSION_PERSONA_CUSTOM);
+      setParentProfile("");
+      setPetProfile("");
+      setOrderEntries([createEmptyGatherOrderField()]);
+      setBrowsingHistoryText("");
       return;
     }
     const p = getSessionPersona(id);
@@ -235,6 +302,42 @@ export default function App() {
     setOrderEntries([createEmptyGatherOrderField()]);
     setBrowsingHistoryText("");
     setSessionContextPanelOpen(true);
+    setHistorySheetOpen(false);
+    setArchivedChatSessions([]);
+    setHistoryMocksHidden(false);
+  }
+
+  function clearChatHistoryList() {
+    setArchivedChatSessions([]);
+    setHistoryMocksHidden(true);
+  }
+
+  function newChatFromHistorySheet() {
+    if (phase === "welcome" && welcomeRaw.trim()) {
+      startChatting();
+      setHistorySheetOpen(false);
+      return;
+    }
+    if (phase === "chat" && welcomeRaw.trim()) {
+      const userLines = messages.filter((m) => m.role === "user").map((m) => m.content);
+      const hadConversation = userLines.length > 0 || messages.length > 1;
+      if (hadConversation) {
+        const title = titleFromArchivedMessages(userLines);
+        setArchivedChatSessions((prev) => [
+          { id: `arch-${Date.now()}`, dateLabel: formatHistoryMonthDay(new Date()), title },
+          ...prev,
+        ]);
+      }
+      setMessages([{ role: "assistant", content: welcomeRaw }]);
+      setInput("");
+      setOrderPick(null);
+      setReturnFlowOrder(null);
+      setReturnFlowLead(null);
+      setReturnFlowLeadLoading(false);
+      setHistorySheetOpen(false);
+      return;
+    }
+    setHistorySheetOpen(false);
   }
 
   async function sendUserText(text: string) {
@@ -372,8 +475,12 @@ export default function App() {
   const stepLabel =
     phase === "gather" ? "Step 1 · Gather context" : phase === "welcome" ? "Step 2 · Your welcome" : "Chat";
 
+  const gatherPresetAccordions = sessionPersonaId !== SESSION_PERSONA_CUSTOM;
+
   const showWorkbenchChatThread = !(iphonePreview && phase === "chat");
 
+  /** Phone bezel + split layout only after welcome exists; Step 1 gather stays full-width on the form. */
+  const showPhoneWorkbenchLayout = iphonePreview && phase !== "gather";
   const welcomePhoneCentered = iphonePreview && phase === "welcome";
   const phoneChatFocusMode = iphonePreview && phase === "chat" && !sessionContextPanelOpen;
   const workbenchPhoneSoloLayout = welcomePhoneCentered || phoneChatFocusMode;
@@ -392,9 +499,11 @@ export default function App() {
           </div>
         </div>
         <div className="header-actions">
-          <button type="button" className="btn-text" onClick={() => setIphonePreview((v) => !v)}>
-            {iphonePreview ? "Exit phone preview" : "iPhone 14 preview"}
-          </button>
+          {phase !== "gather" ? (
+            <button type="button" className="btn-text" onClick={() => setIphonePreview((v) => !v)}>
+              {iphonePreview ? "Exit phone preview" : "iPhone 14 preview"}
+            </button>
+          ) : null}
           {phase === "chat" && (
             <button type="button" className="btn-text" onClick={startOver}>
               New session
@@ -415,14 +524,11 @@ export default function App() {
               Pick a preset persona or add your own details by choosing <strong>Custom</strong>.
             </p>
 
-            <div className="field-block persona-picker" role="radiogroup" aria-labelledby="persona-picker-label">
-              <p className="label" id="persona-picker-label">
-                Session preset
+            <div className="field-block persona-picker" role="radiogroup" aria-labelledby="select-a-pet-label">
+              <p className="label" id="select-a-pet-label">
+                Select a pet
               </p>
-              <p className="label-hint" id="persona-picker-hint">
-                Selecting a persona replaces the main text areas below. Editing any field switches you to Custom.
-              </p>
-              <div className="persona-options" aria-describedby="persona-picker-hint">
+              <div className="persona-options">
                 {SESSION_PERSONAS.map((p) => (
                   <label key={p.id} className="persona-option">
                     <input
@@ -480,19 +586,28 @@ export default function App() {
               </div>
             </div>
 
-            {iphonePreview && (
-              <p className="hint gather-phone-hint">
-                With <strong>iPhone preview</strong> on, these fields stay in the workbench; the phone shows the welcome
-                after you generate it, then the full chat thread once you start chatting.
-              </p>
-            )}
+            <div className="gather-session-divider" aria-hidden="true">
+              <div className="gather-session-divider__line" />
+            </div>
 
             <div className="field-stack">
-              <div className="field-block">
-                <label className="label" htmlFor="parent">
-                  Pet parent profile
-                </label>
-                <p className="label-hint">Name, city/region if relevant, preferences, household, Autoship habits, etc.</p>
+              <GatherSessionFieldBlock
+                accordion={gatherPresetAccordions}
+                summaryTitle="Pet parent profile"
+                summaryHint="Name, city/region if relevant, preferences, household, Autoship habits, etc."
+              >
+                {gatherPresetAccordions ? (
+                  <label className="visually-hidden" htmlFor="parent">
+                    Pet parent profile
+                  </label>
+                ) : (
+                  <>
+                    <label className="label" htmlFor="parent">
+                      Pet parent profile
+                    </label>
+                    <p className="label-hint">Name, city/region if relevant, preferences, household, Autoship habits, etc.</p>
+                  </>
+                )}
                 <textarea
                   id="parent"
                   className="textarea"
@@ -504,13 +619,29 @@ export default function App() {
                     setParentProfile(e.target.value);
                   }}
                 />
-              </div>
+              </GatherSessionFieldBlock>
 
-              <div className="field-block">
-                <label className="label" htmlFor="pet">
-                  Pet profile <span className="optional">(optional)</span>
-                </label>
-                <p className="label-hint">Pet names, species, breed, age, weight, sensitivities, vet notes the parent shared.</p>
+              <GatherSessionFieldBlock
+                accordion={gatherPresetAccordions}
+                summaryTitle={
+                  <>
+                    Pet profile <span className="optional">(optional)</span>
+                  </>
+                }
+                summaryHint="Pet names, species, breed, age, weight, sensitivities, vet notes the parent shared."
+              >
+                {gatherPresetAccordions ? (
+                  <label className="visually-hidden" htmlFor="pet">
+                    Pet profile (optional)
+                  </label>
+                ) : (
+                  <>
+                    <label className="label" htmlFor="pet">
+                      Pet profile <span className="optional">(optional)</span>
+                    </label>
+                    <p className="label-hint">Pet names, species, breed, age, weight, sensitivities, vet notes the parent shared.</p>
+                  </>
+                )}
                 <textarea
                   id="pet"
                   className="textarea"
@@ -522,14 +653,32 @@ export default function App() {
                     setPetProfile(e.target.value);
                   }}
                 />
-              </div>
+              </GatherSessionFieldBlock>
 
-              <div className="field-block" aria-describedby="order-history-hint">
-                <p className="label" id="order-history-label">
-                  Order history
-                </p>
-                <div className="order-history-hint" id="order-history-hint">
-                  <p className="order-history-hint__lead">Add up to 5 orders.</p>
+              <GatherSessionFieldBlock
+                accordion={gatherPresetAccordions}
+                summaryTitle="Order history"
+                summaryHint="Add up to 5 orders."
+                fieldBlockProps={
+                  gatherPresetAccordions ? {} : { "aria-describedby": "order-history-hint" }
+                }
+              >
+                {gatherPresetAccordions ? (
+                  <p className="label visually-hidden" id="order-history-label">
+                    Order history
+                  </p>
+                ) : (
+                  <p className="label" id="order-history-label">
+                    Order history
+                  </p>
+                )}
+                <div
+                  className={
+                    gatherPresetAccordions ? "order-history-hint order-history-hint--accordion-solo" : "order-history-hint"
+                  }
+                  id="order-history-hint"
+                >
+                  {!gatherPresetAccordions ? <p className="order-history-hint__lead">Add up to 5 orders.</p> : null}
                   <details className="order-history-hint__details">
                     <summary className="order-history-hint__summary">
                       <span className="visually-hidden">How these fields work</span>
@@ -712,15 +861,27 @@ export default function App() {
                     {orderEntries.length >= 5 ? "Maximum 5 orders" : "Add an order"}
                   </button>
                 </div>
-              </div>
+              </GatherSessionFieldBlock>
 
-              <div className="field-block">
-                <label className="label" htmlFor="browsing-history">
-                  Browsing history
-                </label>
-                <p className="label-hint" id="browsing-history-hint">
-                  Categories browsed, search queries, PDP views, and other non-order signals.
-                </p>
+              <GatherSessionFieldBlock
+                accordion={gatherPresetAccordions}
+                summaryTitle="Browsing history"
+                summaryHint="Categories browsed, search queries, PDP views, and other non-order signals."
+              >
+                {gatherPresetAccordions ? (
+                  <label className="visually-hidden" htmlFor="browsing-history">
+                    Browsing history
+                  </label>
+                ) : (
+                  <>
+                    <label className="label" htmlFor="browsing-history">
+                      Browsing history
+                    </label>
+                    <p className="label-hint" id="browsing-history-hint">
+                      Categories browsed, search queries, PDP views, and other non-order signals.
+                    </p>
+                  </>
+                )}
                 <textarea
                   id="browsing-history"
                   className="textarea"
@@ -731,9 +892,9 @@ export default function App() {
                     setSessionPersonaId(SESSION_PERSONA_CUSTOM);
                     setBrowsingHistoryText(e.target.value);
                   }}
-                  aria-describedby="browsing-history-hint"
+                  aria-describedby={gatherPresetAccordions ? undefined : "browsing-history-hint"}
                 />
-              </div>
+              </GatherSessionFieldBlock>
             </div>
 
             {error && <div className="banner error">{error}</div>}
@@ -845,7 +1006,7 @@ export default function App() {
                             ) : null}
                             {m.role === "assistant" && bodyAfterVet?.trim() ? (
                               <div className="bubble-body cai-msg-ai-body-after-vet">
-                                <CaiAssistantLeadContent text={bodyAfterVet} variant="panel" />
+                                <CaiAssistantLeadContent text={bodyAfterVet} variant="afterVet" />
                               </div>
                             ) : null}
                             {m.role === "assistant" && orders ? (
@@ -966,7 +1127,7 @@ export default function App() {
     </>
   );
 
-  return iphonePreview ? (
+  return showPhoneWorkbenchLayout ? (
     <div className="device-workbench">
       <div className="layout layout--workbench device-workbench-top">
         {workbenchHeader}
@@ -1018,6 +1179,18 @@ export default function App() {
               onChatInputChange={setInput}
               onSend={() => void sendUserText(input)}
               chatLoading={chatLoading || returnFlowLeadLoading}
+              onOpenChatHistory={() => setHistorySheetOpen(true)}
+              phoneOverlay={
+                <CaiChatHistorySheet
+                  open={historySheetOpen}
+                  onClose={() => setHistorySheetOpen(false)}
+                  entries={chatHistoryEntries}
+                  onNewChat={newChatFromHistorySheet}
+                  onClearHistory={clearChatHistoryList}
+                  clearDisabled={!canClearChatHistory}
+                  onSelectEntry={() => setHistorySheetOpen(false)}
+                />
+              }
             >
               {phase === "chat" ? (
                 welcomeRaw.trim() ? (

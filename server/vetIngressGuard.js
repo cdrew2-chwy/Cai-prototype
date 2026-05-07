@@ -5,6 +5,18 @@
 
 const VET_FENCE = "\n\n```cai-vet-ingress\n{}\n```";
 
+/**
+ * User tapped the **Connect with a Vet** prompt chip (welcome or thread). Short label only — not a
+ * free-typed paragraph — so we can safely force the vet ingress card when the model omits the fence.
+ */
+export function connectWithVetIngressChipTurn(userText) {
+  const t = (userText || "").trim().toLowerCase().replace(/\s+/g, " ");
+  if (!t) return false;
+  if (t === "connect with a vet" || t === "connect with vet") return true;
+  if (t.length > 48) return false;
+  return /^(open\s+)?connect with (a )?vet\b/.test(t);
+}
+
 /** Scratch posts/pads are catalog shopping, not “pet is scratching” dermatology—unless other symptoms appear. */
 function isScratchSurfaceShoppingQuery(t) {
   return /\bscratch(?:ing)?(?:[\s-]+posts?|[\s-]+pads?)\b/i.test(t);
@@ -65,7 +77,9 @@ export function petHealthUserTurnWantsVetCard(userText) {
 export function ensureVetIngressInReply(reply, latestUserText) {
   const raw = reply ?? "";
   if (/```\s*cai-vet-ingress\b/i.test(raw)) return raw;
-  if (!petHealthUserTurnWantsVetCard(latestUserText)) return raw;
+  const forceVetCard =
+    petHealthUserTurnWantsVetCard(latestUserText) || connectWithVetIngressChipTurn(latestUserText);
+  if (!forceVetCard) return raw;
 
   const trimmed = raw.trimEnd();
   const lines = trimmed.split("\n");

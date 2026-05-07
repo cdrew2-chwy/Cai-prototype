@@ -1,6 +1,6 @@
 import { splitFirstSentence } from "./chatUtils";
 
-type Variant = "phone" | "panel";
+type Variant = "phone" | "panel" | "afterVet";
 
 type Props = {
   text: string;
@@ -9,8 +9,22 @@ type Props = {
 
 /**
  * First sentence uses Figma 1117:13599 (Editorial / Heading-1-Stronger); remainder uses body copy.
+ * {@link Variant} `afterVet` — Figma 3309:60598: full block as Editorial / Text-2-Strong, secondary color (no lead split).
  */
 export function CaiAssistantLeadContent({ text, variant }: Props) {
+  if (variant === "afterVet") {
+    const t = text.trim();
+    if (!t) return null;
+    return (
+      <p
+        className="cai-assistant-after-vet cai-text-editorial-text-2-strong cai-text-editorial-text-2-strong--secondary"
+        data-node-id="3309:60598"
+      >
+        {t}
+      </p>
+    );
+  }
+
   const { lead, rest } = splitFirstSentence(text);
   if (variant === "phone") {
     return (

@@ -291,7 +291,6 @@
   color: var(--color-text-tertiary);
 }
 
-.gather-phone-hint,
 .welcome-phone-hint,
 .chat-phone-hint {
   margin-top: 0.25rem;
@@ -364,8 +363,86 @@
   gap: 1rem;
 }
 
-.session-first-time-block {
-  margin-bottom: 1rem;
+/* Gather step: preset personas collapse parent / pet / orders / browsing into <details> accordions */
+.gather-accordion {
+  border: 1px solid #e3e8ee;
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.gather-accordion__summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 0.75rem 2.25rem 0.75rem 0.85rem;
+  position: relative;
+  user-select: none;
+}
+
+.gather-accordion__summary::-webkit-details-marker {
+  display: none;
+}
+
+.gather-accordion__summary::after {
+  content: "";
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  width: 0.45rem;
+  height: 0.45rem;
+  margin-top: -0.2rem;
+  border-right: 2px solid #64748b;
+  border-bottom: 2px solid #64748b;
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+}
+
+.gather-accordion[open] > .gather-accordion__summary::after {
+  margin-top: 0.05rem;
+  transform: rotate(-135deg);
+}
+
+.gather-accordion[open] > .gather-accordion__summary {
+  border-bottom: 1px solid #e3e8ee;
+  background: #fafbfc;
+}
+
+.gather-accordion__summary-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+  padding-right: 0.25rem;
+}
+
+.gather-accordion__title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #0f172a;
+  line-height: 1.25;
+}
+
+.gather-accordion__hint {
+  font-size: 0.82rem;
+  color: #64748b;
+  line-height: 1.35;
+}
+
+.gather-accordion__panel {
+  padding: 0.75rem 0.85rem 0.85rem;
+}
+
+.gather-accordion__field-block {
+  margin-bottom: 0;
+}
+
+.gather-accordion__field-block > .label:first-child {
+  margin-top: 0;
+}
+
+/* First-time toggle: no extra margin below; following gather-session-divider supplies 16px + rule + 16px like above */
+.gather-panel > .field-block.session-first-time-block {
+  margin-bottom: 0;
 }
 
 .session-first-time-row {
@@ -498,6 +575,10 @@
   margin-left: 0.25rem;
 }
 
+.order-history-hint--accordion-solo .order-history-hint__details {
+  margin-left: 0;
+}
+
 .order-history-hint__summary {
   display: inline-flex;
   align-items: center;
@@ -594,7 +675,7 @@
   accent-color: var(--color-ui-bg-brand-primary, #1c49c2);
 }
 
-/* 32px vertical rhythm (16 + 16) around a 0.5px rule between session preset and session toggles */
+/* 32px vertical rhythm (16 + 16) around a 0.5px rule between session sections in gather */
 .gather-session-divider {
   margin-top: 16px;
   margin-bottom: 16px;

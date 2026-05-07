@@ -111,6 +111,20 @@
   margin: 0;
 }
 
+/* Figma 3309:60598 — Editorial / Text-2-Strong on secondary (post–vet “meanwhile” bridge) */
+.cai-text-editorial-text-2-strong.cai-text-editorial-text-2-strong--secondary {
+  color: var(--color-text-secondary);
+}
+
+/** Full “meanwhile / after vet fence” line — Figma 3309:60598 (py 4px container). */
+.cai-assistant-after-vet {
+  margin: 0;
+  padding: 4px 0;
+  width: 100%;
+  box-sizing: border-box;
+  white-space: pre-wrap;
+}
+
 .cai-text-utility-3 {
   font-family: var(--typography-text-typeface);
   font-size: var(--typography-fs-utility-3);

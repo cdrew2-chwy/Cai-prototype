@@ -1,0 +1,317 @@
+/* Figma 3426:77197 / 3426:77332 — Chat history bottom sheet; 3633:39615 — empty state */
+
+.cai-history-root {
+  position: absolute;
+  inset: 0;
+  z-index: 24;
+  pointer-events: none;
+}
+
+.cai-history-root--open {
+  pointer-events: auto;
+}
+
+.cai-history-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: rgb(0 0 0 / 0.45);
+  opacity: 0;
+  transition: opacity 0.28s ease;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.cai-history-root--open .cai-history-backdrop {
+  opacity: 1;
+}
+
+.cai-history-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  /* Figma 3633:39644 — min 75% of phone frame */
+  min-height: 75%;
+  max-height: 100%;
+  background: #fff;
+  border-radius: 10px 10px 0 0;
+  box-shadow:
+    0 0 1px rgb(0 0 0 / 0.24),
+    0 -1px 12px rgb(0 0 0 / 0.12);
+  transform: translateY(100%);
+  transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+  box-sizing: border-box;
+}
+
+.cai-history-root--open .cai-history-sheet {
+  transform: translateY(0);
+}
+
+.cai-history-sheet__grabber-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 5px 0 3px;
+  flex-shrink: 0;
+}
+
+.cai-history-sheet__grabber {
+  width: 36px;
+  height: 5px;
+  border-radius: 5px;
+  background: #949494;
+  opacity: 0.5;
+}
+
+.cai-history-sheet__header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 16px;
+  min-height: 44px;
+  flex-shrink: 0;
+}
+
+.cai-history-sheet__close {
+  flex: 0 0 88px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 10px 12px;
+  margin: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: #002957;
+  border-radius: 8px;
+}
+
+.cai-history-sheet__close:hover {
+  background: rgb(0 41 87 / 0.06);
+}
+
+.cai-history-sheet__close:focus-visible {
+  outline: 2px solid #1c49c2;
+  outline-offset: 2px;
+}
+
+.cai-history-sheet__close-icon {
+  display: block;
+  width: 24px;
+  height: 24px;
+}
+
+.cai-history-sheet__title {
+  flex: 1 1 auto;
+  margin: 0;
+  text-align: center;
+  font-family: var(--typography-text-typeface);
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 22px;
+  letter-spacing: -0.408px;
+  color: #002957;
+}
+
+.cai-history-sheet__new {
+  flex: 0 0 auto;
+  min-width: 88px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 8px;
+  margin: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--typography-text-typeface);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 20px;
+  letter-spacing: var(--typography-ls-standard);
+  color: #1c49c2;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
+.cai-history-sheet__new:hover:not(:disabled) {
+  background: rgb(28 73 194 / 0.06);
+}
+
+.cai-history-sheet__new:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.cai-history-sheet__new:focus-visible {
+  outline: 2px solid #1c49c2;
+  outline-offset: 2px;
+}
+
+.cai-history-sheet__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.cai-history-sheet__scroll--empty {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.cai-history-sheet__scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.cai-history-sheet__empty-stack {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  min-height: 0;
+  padding: 8px 16px 0;
+  box-sizing: border-box;
+}
+
+.cai-history-sheet__empty-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px 0;
+  box-sizing: border-box;
+}
+
+.cai-history-sheet__empty-line {
+  margin: 0;
+  text-align: center;
+  font-family: var(--typography-text-typeface);
+  font-size: var(--typography-fs-editorial-text-2, 15px);
+  font-weight: var(--typography-fw-editorial-text-normal, 400);
+  line-height: var(--typography-lh-editorial-text-2, 24px);
+  letter-spacing: var(--typography-ls-standard);
+  color: var(--color-text-tertiary, #767676);
+  white-space: nowrap;
+}
+
+@media (max-width: 360px) {
+  .cai-history-sheet__empty-line {
+    white-space: normal;
+  }
+}
+
+.cai-history-sheet__list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 16px 0;
+  margin: 0;
+  list-style: none;
+}
+
+.cai-history-sheet__row {
+  margin: 0;
+}
+
+.cai-history-sheet__card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: background 0.15s ease;
+}
+
+.cai-history-sheet__card:hover {
+  background: #f8fafc;
+}
+
+.cai-history-sheet__card:focus-visible {
+  outline: 2px solid #1c49c2;
+  outline-offset: 2px;
+}
+
+.cai-history-sheet__card-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cai-history-sheet__card-date {
+  font-family: var(--typography-text-typeface);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 18px;
+  color: var(--color-text-tertiary, #767676);
+}
+
+.cai-history-sheet__card-title {
+  font-family: var(--typography-text-typeface);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--color-text-primary, #121212);
+}
+
+.cai-history-sheet__chevron {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  color: #64748b;
+}
+
+.cai-history-sheet__clear-wrap {
+  display: flex;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 16px 16px 8px;
+}
+
+.cai-history-sheet__clear-wrap--in-empty {
+  padding: 0 16px 16px;
+}
+
+.cai-history-sheet__clear {
+  margin: 0;
+  padding: 8px 16px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #fff;
+  font-family: var(--typography-text-typeface);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 18px;
+  color: #334155;
+  cursor: pointer;
+}
+
+.cai-history-sheet__clear:hover:not(:disabled) {
+  border-color: #94a3b8;
+}
+
+.cai-history-sheet__clear:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}

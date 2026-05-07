@@ -370,7 +370,8 @@ export async function enrichOrderHistoryWithPdpData(orderHistory) {
     }
     if (enriched.title) o.summary = enriched.title;
     if (enriched.imageUrl) o.imageUrl = enriched.imageUrl;
-    if (enriched.title && !enriched.imageUrl && before && needsPdpScrape(before)) {
+    /** Keep original PDP link so the client can resolve `/order-fallbacks/dp-*.png` when the remote image fails. */
+    if (before && needsPdpScrape(before.trim())) {
       o.productPageUrl = before.trim();
     }
   }

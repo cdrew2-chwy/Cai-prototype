@@ -1,6 +1,6 @@
 import addToCartIconButton from "./assets/cai-add-to-cart-icon-button.svg";
 import type { CaiProductItem, CaiProductsBlock } from "./chatUtils";
-import { useChewyRemoteImageSrc } from "./useChewyProductImageSrc";
+import { CAI_PRODUCT_CARD_GENERIC_FALLBACK, useChewyRemoteImageSrc } from "./useChewyProductImageSrc";
 import "./cai-product-cards.css";
 
 function formatReviewCount(n: number): string {
@@ -72,10 +72,17 @@ function CardMedia({ item }: { item: CaiProductItem }) {
       </div>
     );
   }
-  const initial = item.title.trim().charAt(0).toUpperCase() || "?";
   return (
-    <div className="cai-product-card__media cai-product-card__media--recommend cai-product-card__placeholder">
-      <span>{initial}</span>
+    <div className="cai-product-card__media cai-product-card__media--recommend cai-product-card__media--generic-fallback">
+      <img
+        className="cai-product-card__img cai-product-card__img--generic-fallback"
+        src={CAI_PRODUCT_CARD_GENERIC_FALLBACK}
+        alt=""
+        width={192}
+        height={192}
+        decoding="async"
+        data-node-id="3645:47128"
+      />
     </div>
   );
 }

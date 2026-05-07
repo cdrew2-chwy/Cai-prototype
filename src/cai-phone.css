@@ -148,6 +148,7 @@
   margin: -1px;
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
   white-space: nowrap;
   border: 0;
 }
@@ -596,6 +597,7 @@ button.cai-prompt-chip {
   place-items: center;
   background: transparent;
   color: var(--color-text-brand, #4657c7);
+  overflow: hidden;
 }
 
 .cai-prompt-chip--rich .cai-order-pick-intent__svg {
@@ -615,9 +617,12 @@ button.cai-prompt-chip {
   line-height: 1;
   width: 24px;
   height: 24px;
+  max-width: 24px;
+  max-height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
   font-variation-settings:
     "FILL" 0,
     "wght" 400,

@@ -55,6 +55,9 @@ type Props = {
   onChatInputChange: (v: string) => void;
   onSend: () => void;
   chatLoading: boolean;
+  onOpenChatHistory?: () => void;
+  /** Portal overlay (e.g. chat history sheet) — must be positioned within `.cai-phone`. */
+  phoneOverlay?: ReactNode;
 };
 
 /** Figma “Chat ingress icon” (node 3145:47986 / Chat chat bar). */
@@ -66,7 +69,16 @@ function ChatIngressIcon() {
   );
 }
 
-export function CaiPhoneScreen({ phase, children, chatInput, onChatInputChange, onSend, chatLoading }: Props) {
+export function CaiPhoneScreen({
+  phase,
+  children,
+  chatInput,
+  onChatInputChange,
+  onSend,
+  chatLoading,
+  onOpenChatHistory,
+  phoneOverlay,
+}: Props) {
   const inputId = useId();
   const composerEnabled = phase === "chat";
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -204,8 +216,9 @@ export function CaiPhoneScreen({ phase, children, chatInput, onChatInputChange, 
         </footer>
 
         {/* Figma 3145:47990 — same frame as chat bar; no parent transform (fixes blur / centering) */}
-        <CaiTopOfSheet className="cai-tos--phone-overlay" />
+        <CaiTopOfSheet className="cai-tos--phone-overlay" onHistoryClick={onOpenChatHistory} />
       </div>
+      {phoneOverlay}
     </div>
   );
 }

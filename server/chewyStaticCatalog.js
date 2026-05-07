@@ -5,13 +5,18 @@
 
 import { getCatalogEntry } from "./productCatalog.js";
 
-/** Bundled thumbnails when catalog scrape returns no image (HTTP 429). */
+/** Bundled thumbnails when catalog scrape returns no image (HTTP 429). Keys match `public/order-fallbacks/`. */
 /** @type {Record<string, string>} */
 export const PDP_IMAGE_FALLBACK_BY_DP_ID = {
   "3730174": "/order-fallbacks/dp-3730174.png",
   "168308": "/order-fallbacks/dp-168308.png",
   "851790": "/order-fallbacks/dp-851790.png",
   "2277670": "/order-fallbacks/dp-2277670.png",
+  "46729": "/order-fallbacks/dp-46729.png",
+  "183796": "/order-fallbacks/dp-183796.png",
+  "348131": "/order-fallbacks/dp-348131.png",
+  /** Bug persona treat row — no dedicated asset yet; reuse Purina-adjacent thumb for prototype */
+  "986838": "/order-fallbacks/dp-3730174.png",
 };
 
 /** If CSV has no row, fall back to these titles only when summary is still a PDP URL. */

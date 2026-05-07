@@ -48,9 +48,11 @@ function useStatusBarTime(): { label: string; dateTime: string } {
 
 type Props = {
   className?: string;
+  /** Opens chat history bottom sheet (Figma 3426:77197). */
+  onHistoryClick?: () => void;
 };
 
-export function CaiTopOfSheet({ className }: Props) {
+export function CaiTopOfSheet({ className, onHistoryClick }: Props) {
   const statusTime = useStatusBarTime();
 
   return (
@@ -89,7 +91,12 @@ export function CaiTopOfSheet({ className }: Props) {
         </div>
 
         <div className="cai-tos__side cai-tos__side--right" data-name="Right actions">
-          <button type="button" className="cai-tos__icon-btn" aria-label="Chat history">
+          <button
+            type="button"
+            className="cai-tos__icon-btn"
+            aria-label="Chat history"
+            onClick={() => onHistoryClick?.()}
+          >
             <span className="cai-tos__icon-wrap cai-tos__icon-wrap--history">
               <img src={historySvg} alt="" width={24} height={24} decoding="async" />
             </span>

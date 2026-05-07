@@ -13,6 +13,8 @@ const ORDER_THUMB_FALLBACK_BY_DP_ID: Record<string, string> = {
   "46729": "dp-46729.png",
   "851790": "dp-851790.png",
   "2277670": "dp-2277670.png",
+  /** Bug persona — Meow Mix treats (no dp-986838 asset; reuse cat-food thumb) */
+  "986838": "dp-3730174.png",
 };
 
 function publicOrderFallbackUrl(file: string): string {
